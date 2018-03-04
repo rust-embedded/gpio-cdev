@@ -1,0 +1,8 @@
+[package]
+name = "gpio-cdev"
+version = "0.1.0"
+authors = ["Paul Osborne <osbpau@gmail.com>"]
+
+[dependencies]
+libc = "0.2"
+nix = "0.10"
