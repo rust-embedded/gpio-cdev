@@ -9,5 +9,7 @@ keywords = ["linux", "gpio", "gpiochip", "embedded"]
 license = "MIT / Apache-2.0"
 
 [dependencies]
+bitflags = "1.0"
+error-chain = "0.11"
 libc = "0.2"
 nix = "0.10"
