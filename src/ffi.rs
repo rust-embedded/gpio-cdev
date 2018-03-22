@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The rust-gpio-CDC Project Developers.
+// Copyright (c) 2018 The rust-gpio-cdev Project Developers.
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -8,7 +8,7 @@
 
 use libc;
 
-const GPIOHANDLES_MAX: usize = 64;
+pub const GPIOHANDLES_MAX: usize = 64;
 
 // struct gpiochip_info
 #[repr(C)]
@@ -26,30 +26,19 @@ pub struct gpioline_info {
     pub consumer: [libc::c_char; 32],
 }
 
-// Line Request Flags
-bitflags! {
-    struct GpioHandleRequest: libc::uint32_t {
-        const INPUT = (1 << 0);
-        const OUTPUT = (1 << 1);
-        const ACTIVE_LOW = (1 << 2);
-        const OPEN_DRAIN = (1 << 3);
-        const OPEN_SOURCE = (1 << 4);
-    }
+#[repr(C)]
+pub struct gpiohandle_request {
+    pub lineoffsets: [libc::uint32_t; GPIOHANDLES_MAX],
+    pub flags: libc::uint32_t,
+    pub default_values: [libc::uint8_t; GPIOHANDLES_MAX],
+    pub consumer_label: [libc::c_char; 32],
+    pub lines: libc::uint32_t,
+    pub fd: libc::c_int,
 }
 
 #[repr(C)]
-struct gpiohandle_request {
-    lineoffsets: [libc::uint32_t; GPIOHANDLES_MAX],
-    flags: libc::uint32_t,
-    default_values: [libc::uint8_t; GPIOHANDLES_MAX],
-    consumer_label: [libc::c_char; 32],
-    lines: libc::uint32_t,
-    fd: libc::c_int,
-}
-
-#[repr(C)]
-struct gpiohandle_data {
-    values: [libc::uint8_t; GPIOHANDLES_MAX],
+pub struct gpiohandle_data {
+    pub values: [libc::uint8_t; GPIOHANDLES_MAX],
 }
 
 bitflags! {
