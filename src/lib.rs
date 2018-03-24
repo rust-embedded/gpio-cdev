@@ -16,15 +16,21 @@ extern crate nix;
 
 use std::cmp::min;
 use std::ffi::CStr;
-use std::fs::File;
+use std::fs::{File, read_dir, ReadDir};
 use std::mem;
 use std::os::unix::io::{AsRawFd, FromRawFd};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::ptr;
 use std::slice;
 use std::sync::Arc;
 
 mod ffi;
+
+unsafe fn rstr_lcpy(dst: *mut libc::c_char, src: &str, length: usize) {
+    let copylen = min(src.len() + 1, length);
+    ptr::copy_nonoverlapping(src.as_bytes().as_ptr() as *const libc::c_char, dst, copylen - 1);
+    slice::from_raw_parts_mut(dst, length)[copylen - 1] = 0;
+}
 
 mod errors {
     error_chain! {
@@ -45,19 +51,9 @@ mod errors {
 
 pub use errors::*;
 
-// Informational Flags
-bitflags! {
-    pub struct LineFlags: libc::uint32_t {
-        const KERNEL = (1 << 0);
-        const IS_OUT = (1 << 1);
-        const ACTIVE_LOW = (1 << 2);
-        const OPEN_DRAIN = (1 << 3);
-        const OPEN_SOURCE = (1 << 4);
-    }
-}
-
 #[derive(Debug)]
 struct InnerChip {
+    pub path: PathBuf,
     pub file: File,
     pub name: String,
     pub label: String,
@@ -69,22 +65,57 @@ pub struct Chip {
     inner: Arc<Box<InnerChip>>
 }
 
+pub struct ChipIterator {
+    readdir: ReadDir,
+}
+
+impl Iterator for ChipIterator {
+    type Item = Result<Chip>;
+
+    fn next(&mut self) -> Option<Result<Chip>> {
+        while let Some(entry) = self.readdir.next() {
+            match entry {
+                Ok(entry) => {
+                    if entry.path().as_path().to_string_lossy().contains("gpiochip") {
+                        return Some(Chip::new(entry.path()));
+                    }
+                }
+                Err(e) => {
+                    return Some(Err(e.into()));
+                }
+            }
+        }
+
+        None
+    }
+}
+
+pub fn chips() -> Result<ChipIterator> {
+    Ok(ChipIterator {
+        readdir: read_dir("/dev")?,
+    })
+}
 impl Chip {
 
     /// Open the GPIO Chip at the provided path (/dev/gpiochip<N>)
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Chip> {
-        let f = File::open(path)?;
+        let f = File::open(path.as_ref())?;
         let mut info: ffi::gpiochip_info = unsafe { mem::uninitialized() };
         let _ = unsafe { ffi::gpio_get_chipinfo_ioctl(f.as_raw_fd(), &mut info)? };
 
         Ok(Chip {
             inner: Arc::new(Box::new(InnerChip {
                 file: f,
+                path: path.as_ref().to_path_buf(),
                 name: unsafe { CStr::from_ptr(info.name.as_ptr()).to_string_lossy().into_owned() },
                 label: unsafe { CStr::from_ptr(info.label.as_ptr()).to_string_lossy().into_owned() },
                 lines: info.lines,
             }))
         })
+    }
+
+    pub fn path(&self) -> &Path {
+        self.inner.path.as_path()
     }
 
     pub fn name(&self) -> &str {
@@ -100,21 +131,35 @@ impl Chip {
     }
 
     pub fn get_line(&mut self, offset: u32) -> Result<Line> {
-        let mut line_info = ffi::gpioline_info {
-            line_offset: offset,
-            flags: 0,
-            name: [0; 32],
-            consumer: [0; 32],
-        };
-        let _ = unsafe { ffi::gpio_get_lineinfo_ioctl(self.inner.file.as_raw_fd(), &mut line_info)? };
+        Line::new(self.inner.clone(), offset)
+    }
 
-        Ok(Line {
+    pub fn lines(&self) -> LineIterator {
+        LineIterator {
             chip: self.inner.clone(),
-            offset: offset,
-            flags: LineFlags::from_bits_truncate(line_info.flags),
-            name: unsafe { CStr::from_ptr(line_info.name.as_ptr()).to_string_lossy().into_owned() },
-            consumer: unsafe { CStr::from_ptr(line_info.consumer.as_ptr()).to_string_lossy().into_owned() },
-        })
+            idx: 0
+        }
+    }
+}
+
+pub struct LineIterator {
+    chip: Arc<Box<InnerChip>>,
+    idx: u32,
+}
+
+impl Iterator for LineIterator {
+    type Item = Result<Line>;
+
+    fn next(&mut self) -> Option<Result<Line>> {
+        if self.idx < self.chip.lines {
+            // always increment; we don't want to error forever
+            // if we can't get some of the lines.
+            let idx = self.idx;
+            self.idx += 1;
+            Some(Line::new(self.chip.clone(), idx))
+        } else {
+            None
+        }
     }
 }
 
@@ -123,8 +168,8 @@ pub struct Line {
     chip: Arc<Box<InnerChip>>,
     offset: u32,
     flags: LineFlags,
-    name: String,
-    consumer: String,
+    name: Option<String>,
+    consumer: Option<String>,
 }
 
 // Line Request Flags
@@ -138,28 +183,96 @@ bitflags! {
     }
 }
 
-unsafe fn rstr_lcpy(dst: *mut libc::c_char, src: &str, length: usize) {
-    // NOTE: unsafe because dst pointer is not null checked
-    let copylen = min(src.len() + 1, length);
-    ptr::copy_nonoverlapping(src.as_bytes().as_ptr() as *const libc::c_char, dst, copylen - 1);
-    slice::from_raw_parts_mut(dst, length)[copylen - 1] = 0;
+// Informational Flags
+bitflags! {
+    pub struct LineFlags: libc::uint32_t {
+        const KERNEL = (1 << 0);
+        const IS_OUT = (1 << 1);
+        const ACTIVE_LOW = (1 << 2);
+        const OPEN_DRAIN = (1 << 3);
+        const OPEN_SOURCE = (1 << 4);
+    }
+}
+
+pub struct LineRequestBuilder {
+    reqflags: RequestFlags,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum LineDirection {
+    In,
+    Out,
+}
+
+unsafe fn cstrbuf_to_string(buf: &[libc::c_char]) -> Option<String> {
+    if buf[0] == 0 {
+        None
+    } else {
+        Some(CStr::from_ptr(buf.as_ptr()).to_string_lossy().into_owned())
+    }
 }
 
 impl Line {
+
+    fn new(chip: Arc<Box<InnerChip>>, offset: u32) -> Result<Line> {
+        let mut line_info = ffi::gpioline_info {
+            line_offset: offset,
+            flags: 0,
+            name: [0; 32],
+            consumer: [0; 32],
+        };
+        let _ = unsafe { ffi::gpio_get_lineinfo_ioctl(chip.file.as_raw_fd(), &mut line_info)? };
+
+        Ok(Line {
+            chip: chip,
+            offset: offset,
+            flags: LineFlags::from_bits_truncate(line_info.flags),
+            name: unsafe { cstrbuf_to_string(&line_info.name[..]) },
+            consumer: unsafe { cstrbuf_to_string(&line_info.consumer[..]) },
+        })
+    }
+
+    pub fn refresh(self) -> Result<Line> {
+        Line::new(self.chip, self.offset)
+    }
+
     pub fn offset(&self) -> u32 {
         self.offset
     }
 
-    pub fn flags(&self) -> LineFlags {
-        self.flags
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|s| s.as_str())
     }
 
-    pub fn name(&self) -> &str {
-        self.name.as_str()
+    pub fn consumer(&self) -> Option<&str> {
+        self.consumer.as_ref().map(|s| s.as_str())
     }
 
-    pub fn consumer(&self) -> &str {
-        self.consumer.as_str()
+    pub fn is_used(&self) -> bool {
+        !self.flags.is_empty()
+    }
+
+    pub fn is_kernel(&self) -> bool {
+        self.flags.contains(LineFlags::KERNEL)
+    }
+
+    pub fn is_active_low(&self) -> bool {
+        self.flags.contains(LineFlags::ACTIVE_LOW)
+    }
+
+    pub fn is_open_drain(&self) -> bool {
+        self.flags.contains(LineFlags::OPEN_DRAIN)
+    }
+
+    pub fn is_open_source(&self) -> bool {
+        self.flags.contains(LineFlags::OPEN_SOURCE)
+    }
+
+    pub fn direction(&self) -> LineDirection {
+        match self.flags.contains(LineFlags::IS_OUT) {
+            true => LineDirection::Out,
+            false => LineDirection::In,
+        }
     }
 
     pub fn chip(&self) -> Chip {
@@ -168,7 +281,7 @@ impl Line {
         }
     }
 
-    pub fn request(&self, flags: RequestFlags, consumer: &str) -> Result<LineHandle> {
+    pub fn request(&self, flags: RequestFlags, default: u8, consumer: &str) -> Result<LineHandle> {
         // prepare the request; the kernel consumes some of these values and will
         // set the fd for us.
         let mut request = ffi::gpiohandle_request {
@@ -180,10 +293,11 @@ impl Line {
             fd: 0,
         };
         request.lineoffsets[0] = self.offset;
+        request.default_values[0] = default;
         unsafe { rstr_lcpy(request.consumer_label[..].as_mut_ptr(), consumer, request.consumer_label.len()) };
         let _ = unsafe { ffi::gpio_get_linehandle_ioctl(self.chip.file.as_raw_fd(), &mut request) }?;
         Ok(LineHandle {
-            line: self.clone(),
+            line: self.clone().refresh()?,  // TODO: revisit
             flags: flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
