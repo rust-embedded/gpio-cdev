@@ -16,7 +16,7 @@ extern crate nix;
 
 use std::cmp::min;
 use std::ffi::CStr;
-use std::fs::{File, read_dir, ReadDir};
+use std::fs::{read_dir, File, ReadDir};
 use std::mem;
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::path::{Path, PathBuf};
@@ -31,7 +31,11 @@ use errors::*;
 
 unsafe fn rstr_lcpy(dst: *mut libc::c_char, src: &str, length: usize) {
     let copylen = min(src.len() + 1, length);
-    ptr::copy_nonoverlapping(src.as_bytes().as_ptr() as *const libc::c_char, dst, copylen - 1);
+    ptr::copy_nonoverlapping(
+        src.as_bytes().as_ptr() as *const libc::c_char,
+        dst,
+        copylen - 1,
+    );
     slice::from_raw_parts_mut(dst, length)[copylen - 1] = 0;
 }
 
@@ -46,7 +50,7 @@ struct InnerChip {
 
 #[derive(Debug)]
 pub struct Chip {
-    inner: Arc<Box<InnerChip>>
+    inner: Arc<Box<InnerChip>>,
 }
 
 pub struct ChipIterator {
@@ -60,7 +64,12 @@ impl Iterator for ChipIterator {
         while let Some(entry) = self.readdir.next() {
             match entry {
                 Ok(entry) => {
-                    if entry.path().as_path().to_string_lossy().contains("gpiochip") {
+                    if entry
+                        .path()
+                        .as_path()
+                        .to_string_lossy()
+                        .contains("gpiochip")
+                    {
                         return Some(Chip::new(entry.path()));
                     }
                 }
@@ -80,7 +89,6 @@ pub fn chips() -> Result<ChipIterator> {
     })
 }
 impl Chip {
-
     /// Open the GPIO Chip at the provided path (/dev/gpiochip<N>)
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Chip> {
         let f = File::open(path.as_ref())?;
@@ -91,10 +99,18 @@ impl Chip {
             inner: Arc::new(Box::new(InnerChip {
                 file: f,
                 path: path.as_ref().to_path_buf(),
-                name: unsafe { CStr::from_ptr(info.name.as_ptr()).to_string_lossy().into_owned() },
-                label: unsafe { CStr::from_ptr(info.label.as_ptr()).to_string_lossy().into_owned() },
+                name: unsafe {
+                    CStr::from_ptr(info.name.as_ptr())
+                        .to_string_lossy()
+                        .into_owned()
+                },
+                label: unsafe {
+                    CStr::from_ptr(info.label.as_ptr())
+                        .to_string_lossy()
+                        .into_owned()
+                },
                 lines: info.lines,
-            }))
+            })),
         })
     }
 
@@ -121,7 +137,7 @@ impl Chip {
     pub fn lines(&self) -> LineIterator {
         LineIterator {
             chip: self.inner.clone(),
-            idx: 0
+            idx: 0,
         }
     }
 }
@@ -167,6 +183,15 @@ bitflags! {
     }
 }
 
+// Event request flags
+bitflags! {
+    pub struct EventRequestFlags: libc::uint32_t {
+        const RISING_EDGE = (1 << 0);
+        const FALLING_EDGE = (1 << 1);
+        const BOTH_EDGES = Self::RISING_EDGE.bits | Self::FALLING_EDGE.bits;
+    }
+}
+
 // Informational Flags
 bitflags! {
     pub struct LineFlags: libc::uint32_t {
@@ -176,10 +201,6 @@ bitflags! {
         const OPEN_DRAIN = (1 << 3);
         const OPEN_SOURCE = (1 << 4);
     }
-}
-
-pub struct LineRequestBuilder {
-    reqflags: RequestFlags,
 }
 
 #[derive(Debug, PartialEq)]
@@ -197,7 +218,6 @@ unsafe fn cstrbuf_to_string(buf: &[libc::c_char]) -> Option<String> {
 }
 
 impl Line {
-
     fn new(chip: Arc<Box<InnerChip>>, offset: u32) -> Result<Line> {
         let mut line_info = ffi::gpioline_info {
             line_offset: offset,
@@ -261,7 +281,7 @@ impl Line {
 
     pub fn chip(&self) -> Chip {
         Chip {
-            inner: self.chip.clone()
+            inner: self.chip.clone(),
         }
     }
 
@@ -278,11 +298,45 @@ impl Line {
         };
         request.lineoffsets[0] = self.offset;
         request.default_values[0] = default;
-        unsafe { rstr_lcpy(request.consumer_label[..].as_mut_ptr(), consumer, request.consumer_label.len()) };
-        let _ = unsafe { ffi::gpio_get_linehandle_ioctl(self.chip.file.as_raw_fd(), &mut request) }?;
+        unsafe {
+            rstr_lcpy(
+                request.consumer_label[..].as_mut_ptr(),
+                consumer,
+                request.consumer_label.len(),
+            )
+        };
+        unsafe { ffi::gpio_get_linehandle_ioctl(self.chip.file.as_raw_fd(), &mut request) }?;
         Ok(LineHandle {
-            line: self.clone().refresh()?,  // TODO: revisit
+            line: self.clone().refresh()?, // TODO: revisit
             flags: flags,
+            file: unsafe { File::from_raw_fd(request.fd) },
+        })
+    }
+
+    pub fn events(
+        &self,
+        handle_flags: RequestFlags,
+        event_flags: EventRequestFlags,
+        consumer: &str,
+    ) -> Result<LineEventIterator> {
+        let mut request = ffi::gpioevent_request {
+            lineoffset: self.offset,
+            handleflags: handle_flags.bits(),
+            eventflags: event_flags.bits(),
+            consumer_label: unsafe { mem::zeroed() },
+            fd: 0,
+        };
+
+        unsafe {
+            rstr_lcpy(
+                request.consumer_label[..].as_mut_ptr(),
+                consumer,
+                request.consumer_label.len(),
+            )
+        };
+        unsafe { ffi::gpio_get_lineevent_ioctl(self.chip.file.as_raw_fd(), &mut request) }?;
+
+        Ok(LineEventIterator {
             file: unsafe { File::from_raw_fd(request.fd) },
         })
     }
@@ -313,3 +367,71 @@ impl LineHandle {
         &self.line
     }
 }
+
+#[derive(Debug)]
+pub enum EventType {
+    RisingEdge,
+    FallingEdge,
+}
+
+pub struct LineEvent(ffi::gpioevent_data);
+
+impl std::fmt::Debug for LineEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "LineEvent {{ timestamp: {:?}, event_type: {:?} }}",
+            self.timestamp(),
+            self.event_type()
+        )
+    }
+}
+
+impl LineEvent {
+    pub fn timestamp(&self) -> u64 {
+        self.0.timestamp
+    }
+
+    pub fn event_type(&self) -> EventType {
+        if self.0.id == 0x01 {
+            EventType::RisingEdge
+        } else {
+            EventType::FallingEdge
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct LineEventIterator {
+    file: File,
+}
+
+impl Iterator for LineEventIterator {
+    type Item = Result<LineEvent>;
+
+    fn next(&mut self) -> Option<Result<LineEvent>> {
+        let mut data: ffi::gpioevent_data = unsafe { mem::zeroed() };
+        let mut data_as_buf = unsafe {
+            slice::from_raw_parts_mut(
+                &mut data as *mut ffi::gpioevent_data as *mut u8,
+                mem::size_of::<ffi::gpioevent_data>(),
+            )
+        };
+        match nix::unistd::read(self.file.as_raw_fd(), &mut data_as_buf) {
+            Ok(bytes_read) => if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
+                None
+            } else {
+                Some(Ok(LineEvent(data)))
+            },
+            Err(e) => Some(Err(e.into())),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct LinePoll {
+    line: Line,
+    file: File,
+}
+
+impl LinePoll {}

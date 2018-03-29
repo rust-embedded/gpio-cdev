@@ -41,33 +41,19 @@ pub struct gpiohandle_data {
     pub values: [libc::uint8_t; GPIOHANDLES_MAX],
 }
 
-bitflags! {
-    pub struct GpioEventRequestFlags: libc::uint32_t {
-        const RISING_EDGE = (1 << 0);
-        const FALLING_EDGE = (1 << 1);
-        const BOTH_EDGES = Self::RISING_EDGE.bits | Self::FALLING_EDGE.bits;
-    }
-}
-
 #[repr(C)]
 pub struct gpioevent_request {
-    lineoffset: libc::uint32_t,
-    handleflags: libc::uint32_t,
-    eventflags: libc::uint32_t,
-    consumer_label: [libc::c_char; 32],
-    fd: libc::c_int,
-}
-
-#[repr(C)]
-pub enum GpioEventType {
-    RisingEdge = 0x01,
-    FallingEdge = 0x02,
+    pub lineoffset: libc::uint32_t,
+    pub handleflags: libc::uint32_t,
+    pub eventflags: libc::uint32_t,
+    pub consumer_label: [libc::c_char; 32],
+    pub fd: libc::c_int,
 }
 
 #[repr(C)]
 pub struct gpioevent_data {
-    timestamp: libc::uint64_t,
-    id: libc::uint32_t,
+    pub timestamp: libc::uint64_t,
+    pub id: libc::uint32_t,
 }
 
 ioctl!(read gpio_get_chipinfo_ioctl with 0xB4, 0x01; gpiochip_info);
