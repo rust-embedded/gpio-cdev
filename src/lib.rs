@@ -25,31 +25,15 @@ use std::slice;
 use std::sync::Arc;
 
 mod ffi;
+pub mod errors;
+
+use errors::*;
 
 unsafe fn rstr_lcpy(dst: *mut libc::c_char, src: &str, length: usize) {
     let copylen = min(src.len() + 1, length);
     ptr::copy_nonoverlapping(src.as_bytes().as_ptr() as *const libc::c_char, dst, copylen - 1);
     slice::from_raw_parts_mut(dst, length)[copylen - 1] = 0;
 }
-
-mod errors {
-    error_chain! {
-        types {
-            Error,
-            ErrorKind,
-            ResultExt,
-            Result;
-        }
-
-        foreign_links {
-            Nix(::nix::Error);
-            Io(::std::io::Error);
-
-        }
-    }
-}
-
-pub use errors::*;
 
 #[derive(Debug)]
 struct InnerChip {
