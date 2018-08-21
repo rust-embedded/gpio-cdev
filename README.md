@@ -8,8 +8,8 @@
 
 rust-gpio-cdev is a Rust library/crate providing access to [GPIO character device
 ABI](https://www.kernel.org/doc/Documentation/ABI/testing/gpio-cdev).  This API,
-stabilized with Linux v4.4, deprecates the legacy sysfs interface to GPIOs that
-is now deprecated and is planned to be removed from the upstream kernel after
+stabilized with Linux v4.4, deprecates the legacy sysfs interface to GPIOs that is 
+planned to be removed from the upstream kernel after
 year 2020 (which is coming up quickly).
 
 ## Sysfs GPIO vs GPIO Character Device

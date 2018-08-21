@@ -368,7 +368,7 @@ impl LineHandle {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum EventType {
     RisingEdge,
     FallingEdge,
