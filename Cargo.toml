@@ -2,7 +2,17 @@
 name = "gpio-cdev"
 version = "0.1.0"
 authors = ["Paul Osborne <osbpau@gmail.com>"]
+description = "Linux GPIO Character Device Support (/dev/gpiochipN)"
+homepage = "https://github.com/posborne/rust-gpio-cdev"
+readme = "README.md"
+keywords = ["linux", "gpio", "gpiochip", "embedded"]
+license = "MIT / Apache-2.0"
 
 [dependencies]
+bitflags = "1.0"
+error-chain = "0.11"
 libc = "0.2"
 nix = "0.10"
+
+[dev-dependencies]
+quicli = "0.2"
