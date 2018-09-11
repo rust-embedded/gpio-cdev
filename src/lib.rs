@@ -18,7 +18,7 @@ use std::cmp::min;
 use std::ffi::CStr;
 use std::fs::{read_dir, File, ReadDir};
 use std::mem;
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::slice;
@@ -88,6 +88,7 @@ pub fn chips() -> Result<ChipIterator> {
         readdir: read_dir("/dev")?,
     })
 }
+
 impl Chip {
     /// Open the GPIO Chip at the provided path (/dev/gpiochip<N>)
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Chip> {
@@ -313,12 +314,12 @@ impl Line {
         })
     }
 
-    pub fn events(
-        &self,
-        handle_flags: RequestFlags,
-        event_flags: EventRequestFlags,
-        consumer: &str,
-    ) -> Result<LineEventIterator> {
+    pub fn event_handle(&self,
+                        handle_flags: RequestFlags,
+                        event_flags: EventRequestFlags,
+                        consumer: &str,
+                        ) -> Result<LineEventHandle> {
+
         let mut request = ffi::gpioevent_request {
             lineoffset: self.offset,
             handleflags: handle_flags.bits(),
@@ -336,8 +337,24 @@ impl Line {
         };
         unsafe { ffi::gpio_get_lineevent_ioctl(self.chip.file.as_raw_fd(), &mut request) }?;
 
-        Ok(LineEventIterator {
+        Ok(LineEventHandle {
+            line: self.clone().refresh()?, // TODO: revisit
+            handle_flags,
+            event_flags,
             file: unsafe { File::from_raw_fd(request.fd) },
+        })
+    }
+
+    pub fn events(&self,
+                  handle_flags: RequestFlags,
+                  event_flags: EventRequestFlags,
+                  consumer: &str,
+                  ) -> Result<LineEventIterator> {
+
+        let evt_handle = self.event_handle(handle_flags, event_flags, consumer)?;
+        Ok(LineEventIterator {
+            //file: unsafe { File::from_raw_fd(request.fd) },
+            file: evt_handle.file,
         })
     }
 }
@@ -365,6 +382,13 @@ impl LineHandle {
 
     pub fn line(&self) -> &Line {
         &self.line
+    }
+}
+
+impl AsRawFd for LineHandle {
+    /// Gets the raw file descriptor for the LineHandle.
+    fn as_raw_fd(&self) -> RawFd {
+        self.file.as_raw_fd()
     }
 }
 
@@ -402,6 +426,45 @@ impl LineEvent {
 }
 
 #[derive(Debug)]
+pub struct LineEventHandle {
+    line: Line,
+    handle_flags: RequestFlags,
+    event_flags: EventRequestFlags,
+    file: File,
+}
+
+impl LineEventHandle {
+    pub fn get_event(&mut self) -> Result<LineEvent> {
+        let mut data: ffi::gpioevent_data = unsafe { mem::zeroed() };
+        let mut data_as_buf = unsafe {
+            slice::from_raw_parts_mut(
+                &mut data as *mut ffi::gpioevent_data as *mut u8,
+                mem::size_of::<ffi::gpioevent_data>(),
+            )
+        };
+        let bytes_read = nix::unistd::read(self.file.as_raw_fd(), &mut data_as_buf)?;
+
+        if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
+            let e = nix::Error::Sys(nix::errno::Errno::EIO);
+            Err(e.into())
+        } else {
+            Ok(LineEvent(data))
+        }
+    }
+
+    pub fn line(&self) -> &Line {
+        &self.line
+    }
+}
+
+impl AsRawFd for LineEventHandle {
+    /// Gets the raw file descriptor for the LineEventHandle.
+    fn as_raw_fd(&self) -> RawFd {
+        self.file.as_raw_fd()
+    }
+}
+
+#[derive(Debug)]
 pub struct LineEventIterator {
     file: File,
 }
@@ -435,3 +498,4 @@ pub struct LinePoll {
 }
 
 impl LinePoll {}
+
