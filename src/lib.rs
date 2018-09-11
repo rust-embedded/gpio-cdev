@@ -91,7 +91,7 @@ use std::cmp::min;
 use std::ffi::CStr;
 use std::fs::{read_dir, File, ReadDir};
 use std::mem;
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::slice;
@@ -181,7 +181,7 @@ impl Iterator for ChipIterator {
 /// Iterate over all GPIO chips currently present on this system
 pub fn chips() -> Result<ChipIterator> {
     Ok(ChipIterator {
-        readdir: read_dir("/dev").chain_err(|| "unabled to rea /dev directory")?,
+        readdir: read_dir("/dev").chain_err(|| "unabled to read /dev directory")?,
     })
 }
 
@@ -518,11 +518,12 @@ impl Line {
         })
     }
 
-    /// Get a blocking iterator over events (state changes) for this Line
+    /// Get an event handle that can be used as a blocking iterator over
+    /// the events (state changes) for this Line
     ///
-    /// This iterator blocks while there is not another event available
-    /// from the kernel for this line matching the subscription criteria
-    /// specified in the `event_flags`.  The line will be configured
+    /// When used as an iterator, it blocks while there is not another event
+    /// available from the kernel for this line matching the subscription
+    /// criteria specified in the `event_flags`.  The line will be configured
     /// with the specified `handle_flags` and `consumer` label.
     ///
     /// Note that as compared with the sysfs interface, the character
@@ -559,7 +560,7 @@ impl Line {
         handle_flags: LineRequestFlags,
         event_flags: EventRequestFlags,
         consumer: &str,
-    ) -> Result<LineEventIterator> {
+    ) -> Result<LineEventHandle> {
         let mut request = ffi::gpioevent_request {
             lineoffset: self.offset,
             handleflags: handle_flags.bits(),
@@ -580,7 +581,10 @@ impl Line {
                 .chain_err(|| "lineevent ioctl failed")?
         };
 
-        Ok(LineEventIterator {
+        Ok(LineEventHandle {
+            line: self.clone().refresh()?, // TODO: revisit
+            handle_flags,
+            event_flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
     }
@@ -590,7 +594,7 @@ impl Line {
 ///
 /// In order for userspace to read/write the value of a GPIO
 /// it must be requested from the chip using [`Line::request`].
-/// On success, the kernel creates and anonymous file descriptor
+/// On success, the kernel creates an anonymous file descriptor
 /// for interacting with the requested line.  This structure
 /// is the go-between for callers and that file descriptor.
 ///
@@ -647,6 +651,13 @@ impl LineHandle {
     }
 }
 
+impl AsRawFd for LineHandle {
+    /// Gets the raw file descriptor for the LineHandle.
+    fn as_raw_fd(&self) -> RawFd {
+        self.file.as_raw_fd()
+    }
+}
+
 /// Did the Line rise (go active) or fall (go inactive)?
 ///
 /// Maps to kernel [`GPIOEVENT_EVENT_*`] definitions.
@@ -699,13 +710,74 @@ impl LineEvent {
     }
 }
 
-/// Blocking iterator over events for a given line
+/// Handle for retrieving events from the kernel for a line
+///
+/// In order for userspace to retrieve incoming events on a GPIO,
+/// an event handle must be requested from the chip using
+/// [`Line::events`].
+/// On success, the kernel creates an anonymous file descriptor
+/// for reading events. This structure is the go-between for callers
+/// and that file descriptor.
+///
+/// [`Line::events`]: struct.Line.html#method.events
 #[derive(Debug)]
-pub struct LineEventIterator {
+pub struct LineEventHandle {
+    line: Line,
+    handle_flags: LineRequestFlags,
+    event_flags: EventRequestFlags,
     file: File,
 }
 
-impl Iterator for LineEventIterator {
+impl LineEventHandle {
+    /// Retrieve the next event from the kernel for this line
+    ///
+    /// This blocks while there is not another event available from the
+    /// kernel for the line which matches the subscription criteria
+    /// specified in the `event_flags` when the handle was created.
+    pub fn get_event(&self) -> Result<LineEvent> {
+        let mut data: ffi::gpioevent_data = unsafe { mem::zeroed() };
+        let mut data_as_buf = unsafe {
+            slice::from_raw_parts_mut(
+                &mut data as *mut ffi::gpioevent_data as *mut u8,
+                mem::size_of::<ffi::gpioevent_data>(),
+            )
+        };
+        let bytes_read = nix::unistd::read(self.file.as_raw_fd(), &mut data_as_buf)?;
+
+        if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
+            let e = nix::Error::Sys(nix::errno::Errno::EIO);
+            Err(e.into())
+        } else {
+            Ok(LineEvent(data))
+        }
+    }
+
+    /// Request the current state of this Line from the kernel
+    ///
+    /// This value should be 0 or 1 which a "1" representing that
+    /// the line is active.  Usually this means that the line is
+    /// at logic-level high but it could mean the opposite if the
+    /// line has been marked as being ACTIVE_LOW.
+    pub fn get_value(&self) -> Result<u8> {
+        let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
+        let _ = unsafe { ffi::gpiohandle_get_line_values_ioctl(self.file.as_raw_fd(), &mut data)? };
+        Ok(data.values[0])
+    }
+
+    /// Get the Line information associated with this handle.
+    pub fn line(&self) -> &Line {
+        &self.line
+    }
+}
+
+impl AsRawFd for LineEventHandle {
+    /// Gets the raw file descriptor for the LineEventHandle.
+    fn as_raw_fd(&self) -> RawFd {
+        self.file.as_raw_fd()
+    }
+}
+
+impl Iterator for LineEventHandle {
     type Item = Result<LineEvent>;
 
     fn next(&mut self) -> Option<Result<LineEvent>> {
