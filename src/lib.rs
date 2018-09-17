@@ -434,7 +434,7 @@ pub struct LineEventHandle {
 }
 
 impl LineEventHandle {
-    pub fn get_event(&mut self) -> Result<LineEvent> {
+    pub fn get_event(&self) -> Result<LineEvent> {
         let mut data: ffi::gpioevent_data = unsafe { mem::zeroed() };
         let mut data_as_buf = unsafe {
             slice::from_raw_parts_mut(
