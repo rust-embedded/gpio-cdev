@@ -52,6 +52,12 @@ fn do_main(args: Cli) -> errors::Result<()> {
                     if revts.contains(PollEventFlags::POLLIN) {
                         let event = h.get_event()?;
                         println!("[{}] {:?}", h.line().offset(), event);
+
+                        // You can figure out the new level from the event,
+                        // but this shows that you can use the event handle
+                        // to read the value of the bit.
+                        let val = h.get_value()?;
+                        println!("    {}", val);
                     }
                     else if revts.contains(PollEventFlags::POLLPRI) {
                          println!("[{}] Got a POLLPRI", h.line().offset());

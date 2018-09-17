@@ -452,6 +452,12 @@ impl LineEventHandle {
         }
     }
 
+    pub fn get_value(&self) -> Result<u8> {
+        let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
+        let _ = unsafe { ffi::gpiohandle_get_line_values_ioctl(self.file.as_raw_fd(), &mut data)? };
+        Ok(data.values[0])
+    }
+
     pub fn line(&self) -> &Line {
         &self.line
     }
