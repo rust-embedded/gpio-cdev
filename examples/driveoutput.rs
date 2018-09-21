@@ -7,7 +7,8 @@
 // except according to those terms.
 
 extern crate gpio_cdev;
-#[macro_use] extern crate quicli;
+#[macro_use]
+extern crate quicli;
 
 use gpio_cdev::*;
 use quicli::prelude::*;
@@ -27,7 +28,9 @@ fn do_main(args: Cli) -> errors::Result<()> {
 
     // NOTE: we set the default value to the desired state so
     // setting it separately is not required
-    let _handle = chip.get_line(args.line)?.request(RequestFlags::OUTPUT, args.value, "readinput")?;
+    let _handle =
+        chip.get_line(args.line)?
+            .request(LineRequestFlags::OUTPUT, args.value, "readinput")?;
 
     println!("Output being driven... Enter to exit");
     let mut buf = String::new();
@@ -36,11 +39,9 @@ fn do_main(args: Cli) -> errors::Result<()> {
     Ok(())
 }
 
-main!(|args: Cli| {
-    match do_main(args) {
-        Ok(()) => {},
-        Err(e) => {
-            println!("Error: {:?}", e);
-        }
+main!(|args: Cli| match do_main(args) {
+    Ok(()) => {}
+    Err(e) => {
+        println!("Error: {:?}", e);
     }
 });

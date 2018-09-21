@@ -53,11 +53,11 @@ fn main() {
                             flags.push("open-source");
                         }
 
-                       let usage =  if flags.len() > 0 {
+                        let usage = if flags.len() > 0 {
                             format!("[{}]", flags.join(" "))
                         } else {
                             "".to_owned()
-                       };
+                        };
 
                         println!(
                             "\tline {lineno:>3}: {name} {consumer} {usage}",

@@ -7,12 +7,13 @@
 // except according to those terms.
 
 extern crate gpio_cdev;
-#[macro_use] extern crate quicli;
+#[macro_use]
+extern crate quicli;
 
 use gpio_cdev::*;
-use std::time::{Duration, Instant};
-use std::thread::sleep;
 use quicli::prelude::*;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, StructOpt)]
 struct Cli {
@@ -31,7 +32,9 @@ fn do_main(args: Cli) -> errors::Result<()> {
 
     // NOTE: we set the default value to the desired state so
     // setting it separately is not required
-    let handle = chip.get_line(args.line)?.request(RequestFlags::OUTPUT, 1, "readinput")?;
+    let handle = chip
+        .get_line(args.line)?
+        .request(LineRequestFlags::OUTPUT, 1, "readinput")?;
 
     let duration = Duration::from_millis(args.duration_ms);
     let start_time = Instant::now();
@@ -45,11 +48,9 @@ fn do_main(args: Cli) -> errors::Result<()> {
     Ok(())
 }
 
-main!(|args: Cli| {
-    match do_main(args) {
-        Ok(()) => {},
-        Err(e) => {
-            println!("Error: {:?}", e);
-        }
+main!(|args: Cli| match do_main(args) {
+    Ok(()) => {}
+    Err(e) => {
+        println!("Error: {:?}", e);
     }
 });
