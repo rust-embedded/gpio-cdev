@@ -20,6 +20,63 @@
 //! For additional context for why the kernel is moving from the sysfs API to the
 //! character device API, please see the main [README on Github].
 //!
+//! # Examples
+//!
+//! The following example reads the state of a GPIO line/pin and writes the matching
+//! state to another line/pin.
+//!
+//! ```no_run
+//! use gpio_cdev::{Chip, LineRequestFlags, EventRequestFlags, EventType};
+//!
+//! // Lines are offset within gpiochip0; see docs for more info on chips/lines
+//! fn mirror_gpio(inputline: u32, outputline: u32) -> gpio_cdev::errors::Result<()> {
+//!     let mut chip = Chip::new("/dev/gpiochip0")?;
+//!     let input = chip.get_line(inputline)?;
+//!     let output = chip.get_line(outputline)?;
+//!     let output_handle = output.request(LineRequestFlags::OUTPUT, 0, "mirror-gpio")?;
+//!     for event in input.events(
+//!         LineRequestFlags::INPUT,
+//!         EventRequestFlags::BOTH_EDGES,
+//!         "mirror-gpio",
+//!     )? {
+//!         let evt = event?;
+//!         println!("{:?}", evt);
+//!         match evt.event_type() {
+//!             EventType::RisingEdge => {
+//!                 output_handle.set_value(1)?;
+//!             }
+//!             EventType::FallingEdge => {
+//!                 output_handle.set_value(0)?;
+//!             }
+//!         }
+//!     }
+//!
+//!     Ok(())
+//! }
+//!
+//! # fn main() -> gpio_cdev::errors::Result<()> {
+//! #     mirror_gpio(0, 1)
+//! # }
+//! ```
+//!
+//! To get the state of a GPIO Line on a given chip:
+//!
+//! ```no_run
+//! use gpio_cdev::{Chip, LineRequestFlags};
+//!
+//! # fn main() -> gpio_cdev::errors::Result<()> {
+//! // Read the state of GPIO4 on a raspberry pi.  /dev/gpiochip0
+//! // maps to the driver for the SoC (builtin) GPIO controller.
+//! let mut chip = Chip::new("/dev/gpiochip0")?;
+//! let handle = chip
+//!     .get_line(4)?
+//!     .request(LineRequestFlags::INPUT, 0, "read-input")?;
+//! for _ in 1..4 {
+//!     println!("Value: {:?}", handle.get_value()?);
+//! }
+//! # Ok(()) }
+//! ```
+//!
 //! [README on Github]: https://github.com/posborne/rust-gpio-cdev
 
 #[macro_use]
@@ -403,7 +460,7 @@ impl Line {
     /// For an output, the `default` parameter specifies the value
     /// the line should have when it is configured as an output.  The
     /// `consumer` string should describe the process consuming the
-    /// pin (this will be truncated to 31 characters if too long).
+    /// line (this will be truncated to 31 characters if too long).
     ///
     /// # Errors
     ///
@@ -536,9 +593,9 @@ impl LineHandle {
     /// Request the current state of this Line from the kernel
     ///
     /// This call is expected to succeed for both input and output
-    /// pins.  It should be noted, however, that some drivers may
+    /// lines.  It should be noted, however, that some drivers may
     /// not be able to give any useful information when the value
-    /// is requested for an output pin.
+    /// is requested for an output line.
     ///
     /// This value should be 0 or 1 which a "1" representing that
     /// the line is active.  Usually this means that the line is
