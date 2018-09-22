@@ -181,16 +181,20 @@ impl Iterator for ChipIterator {
 /// Iterate over all GPIO chips currently present on this system
 pub fn chips() -> Result<ChipIterator> {
     Ok(ChipIterator {
-        readdir: read_dir("/dev")?,
+        readdir: read_dir("/dev").chain_err(|| "unabled to rea /dev directory")?,
     })
 }
 
 impl Chip {
     /// Open the GPIO Chip at the provided path (e.g. `/dev/gpiochip<N>`)
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Chip> {
-        let f = File::open(path.as_ref())?;
+        let f = File::open(path.as_ref())
+            .chain_err(|| format!("Opening chip at path {:?} failed", path.as_ref()))?;
         let mut info: ffi::gpiochip_info = unsafe { mem::uninitialized() };
-        let _ = unsafe { ffi::gpio_get_chipinfo_ioctl(f.as_raw_fd(), &mut info)? };
+        let _ = unsafe {
+            ffi::gpio_get_chipinfo_ioctl(f.as_raw_fd(), &mut info)
+                .chain_err(|| format!("Getting chip info failed for {:?}", path.as_ref()))?
+        };
 
         Ok(Chip {
             inner: Arc::new(Box::new(InnerChip {
@@ -369,7 +373,10 @@ impl Line {
             name: [0; 32],
             consumer: [0; 32],
         };
-        let _ = unsafe { ffi::gpio_get_lineinfo_ioctl(chip.file.as_raw_fd(), &mut line_info)? };
+        let _ = unsafe {
+            ffi::gpio_get_lineinfo_ioctl(chip.file.as_raw_fd(), &mut line_info)
+                .chain_err(|| "lineinfo ioctl failed")?
+        };
 
         Ok(Line {
             chip: chip,
@@ -500,7 +507,10 @@ impl Line {
                 request.consumer_label.len(),
             )
         };
-        unsafe { ffi::gpio_get_linehandle_ioctl(self.chip.file.as_raw_fd(), &mut request) }?;
+        unsafe {
+            ffi::gpio_get_linehandle_ioctl(self.chip.file.as_raw_fd(), &mut request)
+                .chain_err(|| "linehandle request ioctl failed")?
+        };
         Ok(LineHandle {
             line: self.clone().refresh()?, // TODO: revisit
             flags: flags,
@@ -565,7 +575,10 @@ impl Line {
                 request.consumer_label.len(),
             )
         };
-        unsafe { ffi::gpio_get_lineevent_ioctl(self.chip.file.as_raw_fd(), &mut request) }?;
+        unsafe {
+            ffi::gpio_get_lineevent_ioctl(self.chip.file.as_raw_fd(), &mut request)
+                .chain_err(|| "lineevent ioctl failed")?
+        };
 
         Ok(LineEventIterator {
             file: unsafe { File::from_raw_fd(request.fd) },
@@ -603,7 +616,10 @@ impl LineHandle {
     /// line has been marked as being ACTIVE_LOW.
     pub fn get_value(&self) -> Result<u8> {
         let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
-        let _ = unsafe { ffi::gpiohandle_get_line_values_ioctl(self.file.as_raw_fd(), &mut data)? };
+        let _ = unsafe {
+            ffi::gpiohandle_get_line_values_ioctl(self.file.as_raw_fd(), &mut data)
+                .chain_err(|| "getting line value failed")?
+        };
         Ok(data.values[0])
     }
 
@@ -618,7 +634,10 @@ impl LineHandle {
     pub fn set_value(&self, value: u8) -> Result<()> {
         let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
         data.values[0] = value;
-        let _ = unsafe { ffi::gpiohandle_set_line_values_ioctl(self.file.as_raw_fd(), &mut data)? };
+        let _ = unsafe {
+            ffi::gpiohandle_set_line_values_ioctl(self.file.as_raw_fd(), &mut data)
+                .chain_err(|| "setting line value failed")?
+        };
         Ok(())
     }
 
