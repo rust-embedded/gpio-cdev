@@ -34,7 +34,7 @@ fn do_main(args: Cli) -> errors::Result<()> {
 
     println!("Output being driven... Enter to exit");
     let mut buf = String::new();
-    drop(::std::io::stdin().read_line(&mut buf)?);
+    ::std::io::stdin().read_line(&mut buf)?;
 
     Ok(())
 }
