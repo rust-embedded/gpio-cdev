@@ -7,7 +7,8 @@
 // except according to those terms.
 
 extern crate gpio_cdev;
-#[macro_use] extern crate quicli;
+#[macro_use]
+extern crate quicli;
 
 use gpio_cdev::*;
 use quicli::prelude::*;
@@ -22,17 +23,17 @@ struct Cli {
 
 fn do_main(args: Cli) -> errors::Result<()> {
     let mut chip = Chip::new(args.chip)?;
-    let handle = chip.get_line(args.line)?.request(RequestFlags::INPUT, 0, "readinput")?;
+    let handle = chip
+        .get_line(args.line)?
+        .request(LineRequestFlags::INPUT, 0, "readinput")?;
     println!("Value: {:?}", handle.get_value()?);
 
     Ok(())
 }
 
-main!(|args: Cli| {
-    match do_main(args) {
-        Ok(()) => {},
-        Err(e) => {
-            println!("Error: {:?}", e);
-        }
+main!(|args: Cli| match do_main(args) {
+    Ok(()) => {}
+    Err(e) => {
+        println!("Error: {:?}", e);
     }
 });

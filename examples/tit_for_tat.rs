@@ -7,12 +7,13 @@
 // except according to those terms.
 
 extern crate gpio_cdev;
-#[macro_use] extern crate quicli;
+#[macro_use]
+extern crate quicli;
 
 use gpio_cdev::*;
 use quicli::prelude::*;
-use std::time::Duration;
 use std::thread::sleep;
+use std::time::Duration;
 
 #[derive(Debug, StructOpt)]
 struct Cli {
@@ -30,12 +31,16 @@ fn do_main(args: Cli) -> errors::Result<()> {
     let mut chip = Chip::new(args.chip)?;
     let input = chip.get_line(args.inputline)?;
     let output = chip.get_line(args.outputline)?;
-    let output_handle = output.request(RequestFlags::OUTPUT, 0, "tit_for_tat")?;
+    let output_handle = output.request(LineRequestFlags::OUTPUT, 0, "tit_for_tat")?;
 
     // To show off the buffering characteristics of the new interface we introduce a delay
     // after each change is handled.  When we fall behind, we will "replay" the input
     // events
-    for event in input.events(RequestFlags::INPUT, EventRequestFlags::BOTH_EDGES, "tit_for_tat")? {
+    for event in input.events(
+        LineRequestFlags::INPUT,
+        EventRequestFlags::BOTH_EDGES,
+        "tit_for_tat",
+    )? {
         let evt = event?;
         println!("{:?}", evt);
         match evt.event_type() {
@@ -53,11 +58,9 @@ fn do_main(args: Cli) -> errors::Result<()> {
     Ok(())
 }
 
-main!(|args: Cli| {
-    match do_main(args) {
-        Ok(()) => {},
-        Err(e) => {
-            println!("Error: {:?}", e);
-        }
+main!(|args: Cli| match do_main(args) {
+    Ok(()) => {}
+    Err(e) => {
+        println!("Error: {:?}", e);
     }
 });
