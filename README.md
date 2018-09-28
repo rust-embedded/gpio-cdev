@@ -12,6 +12,78 @@ stabilized with Linux v4.4, deprecates the legacy sysfs interface to GPIOs that 
 planned to be removed from the upstream kernel after
 year 2020 (which is coming up quickly).
 
+Use of this API is encouraged over the sysfs API used by this crate's
+predecessor [sysfs_gpio](https://crates.io/crates/sysfs_gpio) if you don't need
+to target older kernels.  For more information on differences see [Sysfs GPIO vs
+GPIO Character Device](#sysfs-gpio-vs-gpio-character-device).
+
+## Installation
+
+Add the following to your Cargo.toml
+
+```
+[dependencies]
+gpio-cdev = "0.1"
+```
+
+## Examples
+
+There are several additional examples available in the [examples
+directory](https://github.com/posborne/rust-gpio-cdev/tree/master/examples).
+
+### Read State
+
+```rust
+use gpio_cdev::{Chip, LineRequestFlags};
+
+// Read the state of GPIO4 on a raspberry pi.  /dev/gpiochip0
+// maps to the driver for the SoC (builtin) GPIO controller.
+let mut chip = Chip::new("/dev/gpiochip0")?;
+let handle = chip
+    .get_line(4)?
+    .request(LineRequestFlags::INPUT, 0, "read-input")?;
+for _ in 1..4 {
+    println!("Value: {:?}", handle.get_value()?);
+}
+```
+
+### Mirror State (Read/Write)
+
+```rust
+use gpio_cdev::{Chip, LineRequestFlags, EventRequestFlags, EventType};
+
+// Lines are offset within gpiochip0; see docs for more info on chips/lines
+//
+// This function will synchronously follow the state of one line
+// on gpiochip0 and mirror its state on another line.  With this you
+// could, for instance, control the state of an LED with a button
+// if hooked up to the right pins on a raspberry pi.
+fn mirror_gpio(inputline: u32, outputline: u32) -> gpio_cdev::errors::Result<()> {
+    let mut chip = Chip::new("/dev/gpiochip0")?;
+    let input = chip.get_line(inputline)?;
+    let output = chip.get_line(outputline)?;
+    let output_handle = output.request(LineRequestFlags::OUTPUT, 0, "mirror-gpio")?;
+    for event in input.events(
+        LineRequestFlags::INPUT,
+        EventRequestFlags::BOTH_EDGES,
+        "mirror-gpio",
+    )? {
+        let evt = event?;
+        println!("{:?}", evt);
+        match evt.event_type() {
+            EventType::RisingEdge => {
+                output_handle.set_value(1)?;
+            }
+            EventType::FallingEdge => {
+                output_handle.set_value(0)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+```
+
 ## Sysfs GPIO vs GPIO Character Device
 
 Compared to the sysfs gpio interface (as made available by the sysfs_gpio crate)
@@ -98,3 +170,28 @@ using the queueing with timing information captured in the kernel.  Previously, 
 would need to quickly handle the event notification, make another system call
 to the value file to see the state, etc. which had far too many variables involved
 to be considered reliable.
+
+## License
+
+Licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or
+  http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+at your option.
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions.
+
+## Code of Conduct
+
+Contribution to this crate is organized under the terms of the [Rust Code of
+Conduct][CoC], the maintainer of this crate, the [Embedded Linux Team][team], promises
+to intervene to uphold that code of conduct.
+
+[CoC]: CODE_OF_CONDUCT.md
+[team]: https://github.com/rust-embedded/wg#the-embedded-linux-team
