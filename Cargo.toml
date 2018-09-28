@@ -4,9 +4,11 @@ version = "0.1.0"
 authors = ["Paul Osborne <osbpau@gmail.com>"]
 description = "Linux GPIO Character Device Support (/dev/gpiochipN)"
 homepage = "https://github.com/posborne/rust-gpio-cdev"
+repository = "https://github.com/posborne/rust-gpio-cdev"
 readme = "README.md"
+categories = ["embedded", "hardware-support", "os", "os::unix-apis"]
 keywords = ["linux", "gpio", "gpiochip", "embedded"]
-license = "MIT / Apache-2.0"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 bitflags = "1.0"
