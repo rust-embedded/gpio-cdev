@@ -56,10 +56,10 @@ pub struct gpioevent_data {
     pub id: libc::uint32_t,
 }
 
-ioctl!(read gpio_get_chipinfo_ioctl with 0xB4, 0x01; gpiochip_info);
-ioctl!(readwrite gpio_get_lineinfo_ioctl with 0xB4, 0x02; gpioline_info);
-ioctl!(readwrite gpio_get_linehandle_ioctl with 0xB4, 0x03; gpiohandle_request);
-ioctl!(readwrite gpio_get_lineevent_ioctl with 0xB4, 0x04; gpioevent_request);
+ioctl_read!(gpio_get_chipinfo_ioctl, 0xB4, 0x01, gpiochip_info);
+ioctl_readwrite!(gpio_get_lineinfo_ioctl, 0xB4, 0x02, gpioline_info);
+ioctl_readwrite!(gpio_get_linehandle_ioctl, 0xB4, 0x03, gpiohandle_request);
+ioctl_readwrite!(gpio_get_lineevent_ioctl, 0xB4, 0x04, gpioevent_request);
 
-ioctl!(readwrite gpiohandle_get_line_values_ioctl with 0xB4, 0x08; gpiohandle_data);
-ioctl!(readwrite gpiohandle_set_line_values_ioctl with 0xB4, 0x09; gpiohandle_data);
+ioctl_readwrite!(gpiohandle_get_line_values_ioctl, 0xB4, 0x08, gpiohandle_data);
+ioctl_readwrite!(gpiohandle_set_line_values_ioctl, 0xB4, 0x09, gpiohandle_data);
