@@ -17,24 +17,17 @@ use quicli::prelude::*;
 struct Cli {
     /// The gpiochip device (e.g. /dev/gpiochip0)
     chip: String,
-    /// The offset of the GPIO line for the provided chip
-    line: u32,
-    /// The value to write
-    value: u8,
+    /// The offset of the GPIO lines for the provided chip
+    lines: Vec<u32>,
 }
 
 fn do_main(args: Cli) -> errors::Result<()> {
     let mut chip = Chip::new(args.chip)?;
-
-    // NOTE: we set the default value to the desired state so
-    // setting it separately is not required
-    let _handle =
-        chip.get_line(args.line)?
-            .request(LineRequestFlags::OUTPUT, args.value, "driveoutput")?;
-
-    println!("Output being driven... Enter to exit");
-    let mut buf = String::new();
-    ::std::io::stdin().read_line(&mut buf)?;
+    let ini_vals = vec![ 0; args.lines.len() ];
+    let handle = chip
+        .get_lines(&args.lines)?
+        .request(LineRequestFlags::INPUT, &ini_vals, "multiread")?;
+    println!("Values: {:?}", handle.get_values()?);
 
     Ok(())
 }
