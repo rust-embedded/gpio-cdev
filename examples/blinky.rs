@@ -34,7 +34,7 @@ fn do_main(args: Cli) -> errors::Result<()> {
     // setting it separately is not required
     let handle = chip
         .get_line(args.line)?
-        .request(LineRequestFlags::OUTPUT, 1, "readinput")?;
+        .request(LineRequestFlags::OUTPUT, 1, "blinky")?;
 
     let duration = Duration::from_millis(args.duration_ms);
     let start_time = Instant::now();

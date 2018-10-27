@@ -24,7 +24,7 @@ fn do_main(args: Cli) -> errors::Result<()> {
     let ini_vals = vec![ 0; chip.num_lines() as usize ];
     let handle = chip
         .get_all_lines()?
-        .request(LineRequestFlags::INPUT, &ini_vals, "multiread")?;
+        .request(LineRequestFlags::INPUT, &ini_vals, "readall")?;
     println!("Values: {:?}", handle.get_values()?);
 
     Ok(())

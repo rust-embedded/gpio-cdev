@@ -288,22 +288,21 @@ pub struct LineIterator {
 }
 
 impl Iterator for LineIterator {
-    type Item = Result<Line>;
+    type Item = Line;
 
-    fn next(&mut self) -> Option<Result<Line>> {
+    fn next(&mut self) -> Option<Line> {
         if self.idx < self.chip.lines {
-            // always increment; we don't want to error forever
-            // if we can't get some of the lines.
             let idx = self.idx;
             self.idx += 1;
-            Some(Line::new(self.chip.clone(), idx))
+            // Since we checked the index, we know this will be Ok
+            Some(Line::new(self.chip.clone(), idx).unwrap())
         } else {
             None
         }
     }
 }
 
-/// Information about and access to a specific GPIO Line
+/// Access to a specific GPIO Line
 ///
 /// GPIO Lines must be obtained through a parent [`Chip`] and
 /// represent an actual GPIO pin/line accessible via that chip.
@@ -311,13 +310,20 @@ impl Iterator for LineIterator {
 /// map to hardware depending on how the board is setup
 /// in the kernel.
 ///
-/// Wraps kernel [`struct gpioline_info`].
-///
-/// [`struct gpioline_info`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L36
 #[derive(Debug, Clone)]
 pub struct Line {
     chip: Arc<Box<InnerChip>>,
     offset: u32,
+}
+
+/// Information about a specific GPIO Line
+///
+/// Wraps kernel [`struct gpioline_info`].
+///
+/// [`struct gpioline_info`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L36
+#[derive(Debug, Clone)]
+pub struct LineInfo {
+    line: Line,
     flags: LineFlags,
     name: Option<String>,
     consumer: Option<String>,
@@ -383,87 +389,36 @@ unsafe fn cstrbuf_to_string(buf: &[libc::c_char]) -> Option<String> {
 
 impl Line {
     fn new(chip: Arc<Box<InnerChip>>, offset: u32) -> Result<Line> {
+        if offset >= chip.lines {
+            bail!("Offset out of range")
+        }
+        Ok(Line { chip, offset, })
+    }
+
+    /// Get info about the line from the kernel.
+    pub fn info(&self) -> Result<LineInfo> {
         let mut line_info = ffi::gpioline_info {
-            line_offset: offset,
+            line_offset: self.offset,
             flags: 0,
             name: [0; 32],
             consumer: [0; 32],
         };
         let _ = unsafe {
-            ffi::gpio_get_lineinfo_ioctl(chip.file.as_raw_fd(), &mut line_info)
+            ffi::gpio_get_lineinfo_ioctl(self.chip.file.as_raw_fd(), &mut line_info)
                 .chain_err(|| "lineinfo ioctl failed")?
         };
 
-        Ok(Line {
-            chip: chip,
-            offset: offset,
+        Ok(LineInfo {
+            line: self.clone(),
             flags: LineFlags::from_bits_truncate(line_info.flags),
             name: unsafe { cstrbuf_to_string(&line_info.name[..]) },
             consumer: unsafe { cstrbuf_to_string(&line_info.consumer[..]) },
         })
     }
 
-    /// Refresh the cached line info from the kernel
-    pub fn refresh(self) -> Result<Line> {
-        Line::new(self.chip, self.offset)
-    }
-
     /// Offset of this line within its parent chip
     pub fn offset(&self) -> u32 {
         self.offset
-    }
-
-    /// Name assigned to this chip if assigned
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_ref().map(|s| s.as_str())
-    }
-
-    /// The name of this GPIO line, such as the output pin of the line on the
-    /// chip, a rail or a pin header name on a board, as specified by the gpio
-    /// chip.
-    pub fn consumer(&self) -> Option<&str> {
-        self.consumer.as_ref().map(|s| s.as_str())
-    }
-
-    /// True if the any flags for the device are set (input or output)
-    pub fn is_used(&self) -> bool {
-        !self.flags.is_empty()
-    }
-
-    /// True if this line is being used by something else in the kernel
-    ///
-    /// If another driver or subsystem in the kernel is using the line
-    /// then it cannot be used via the cdev interface. See [relevant kernel code].
-    ///
-    /// [relevant kernel code]: https://elixir.bootlin.com/linux/v4.9.127/source/drivers/gpio/gpiolib.c#L938
-    pub fn is_kernel(&self) -> bool {
-        self.flags.contains(LineFlags::KERNEL)
-    }
-
-    /// True if this line is marked as active low in the kernel
-    pub fn is_active_low(&self) -> bool {
-        self.flags.contains(LineFlags::ACTIVE_LOW)
-    }
-
-    /// True if this line is marked as open drain in the kernel
-    pub fn is_open_drain(&self) -> bool {
-        self.flags.contains(LineFlags::OPEN_DRAIN)
-    }
-
-    /// True if this line is marked as open source in the kernel
-    pub fn is_open_source(&self) -> bool {
-        self.flags.contains(LineFlags::OPEN_SOURCE)
-    }
-
-    /// Get the direction of this GPIO if configured
-    ///
-    /// Lines are considered to be inputs if not explicitly
-    /// marked as outputs in the line info flags by the kernel.
-    pub fn direction(&self) -> LineDirection {
-        match self.flags.contains(LineFlags::IS_OUT) {
-            true => LineDirection::Out,
-            false => LineDirection::In,
-        }
     }
 
     /// Get a handle to this chip's parent
@@ -528,7 +483,7 @@ impl Line {
                 .chain_err(|| "linehandle request ioctl failed")?
         };
         Ok(LineHandle {
-            line: self.clone().refresh()?, // TODO: revisit
+            line: self.clone(),
             flags: flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
@@ -598,11 +553,71 @@ impl Line {
         };
 
         Ok(LineEventHandle {
-            line: self.clone().refresh()?, // TODO: revisit
+            line: self.clone(),
             handle_flags,
             event_flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
+    }
+}
+
+impl LineInfo {
+    /// Get a handle to the line that this info represents
+    pub fn line(&self) -> &Line {
+        &self.line
+    }
+
+    /// Name assigned to this chip if assigned
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|s| s.as_str())
+    }
+
+    /// The name of this GPIO line, such as the output pin of the line on the
+    /// chip, a rail or a pin header name on a board, as specified by the gpio
+    /// chip.
+    pub fn consumer(&self) -> Option<&str> {
+        self.consumer.as_ref().map(|s| s.as_str())
+    }
+
+    /// Get the direction of this GPIO if configured
+    ///
+    /// Lines are considered to be inputs if not explicitly
+    /// marked as outputs in the line info flags by the kernel.
+    pub fn direction(&self) -> LineDirection {
+        match self.flags.contains(LineFlags::IS_OUT) {
+            true => LineDirection::Out,
+            false => LineDirection::In,
+        }
+    }
+
+    /// True if the any flags for the device are set (input or output)
+    pub fn is_used(&self) -> bool {
+        !self.flags.is_empty()
+    }
+
+    /// True if this line is being used by something else in the kernel
+    ///
+    /// If another driver or subsystem in the kernel is using the line
+    /// then it cannot be used via the cdev interface. See [relevant kernel code].
+    ///
+    /// [relevant kernel code]: https://elixir.bootlin.com/linux/v4.9.127/source/drivers/gpio/gpiolib.c#L938
+    pub fn is_kernel(&self) -> bool {
+        self.flags.contains(LineFlags::KERNEL)
+    }
+
+    /// True if this line is marked as active low in the kernel
+    pub fn is_active_low(&self) -> bool {
+        self.flags.contains(LineFlags::ACTIVE_LOW)
+    }
+
+    /// True if this line is marked as open drain in the kernel
+    pub fn is_open_drain(&self) -> bool {
+        self.flags.contains(LineFlags::OPEN_DRAIN)
+    }
+
+    /// True if this line is marked as open source in the kernel
+    pub fn is_open_source(&self) -> bool {
+        self.flags.contains(LineFlags::OPEN_SOURCE)
     }
 }
 
