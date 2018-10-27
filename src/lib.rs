@@ -717,7 +717,7 @@ impl Lines {
         self.lines.len()
     }
 
-    /// Request access to interact with this line from the kernel
+    /// Request access to interact with these lines from the kernel
     ///
     /// This is similar to the "export" operation present in the sysfs
     /// API with the key difference that we are also able to configure
@@ -725,7 +725,7 @@ impl Lines {
     /// at the time of request.
     ///
     /// For an output, the `default` parameter specifies the value
-    /// the line should have when it is configured as an output.  The
+    /// each line should have when it is configured as an output.  The
     /// `consumer` string should describe the process consuming the
     /// line (this will be truncated to 31 characters if too long).
     ///
@@ -735,7 +735,7 @@ impl Lines {
     /// error to the ioctl performing the request here.  This will
     /// result in an [`Error`] being returned with [`ErrorKind::Io`].
     ///
-    /// One possible cause for an error here would be if the line is
+    /// One possible cause for an error here would be if the lines are
     /// already in use.  One can check for this prior to making the
     /// request using [`is_kernel`].
     ///
