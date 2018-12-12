@@ -8,7 +8,19 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## 0.1.0 - 2018-09-28
+## v0.2.0 - 2018-12-12
+
+Adds the ability to create a collection of lines from a single chip and read or write those lines simultaneously with a single stystem call.
+ 
+- A new `Lines` object (plural) was added. It is a collection of individual `Line` objects on a single `Chip` which can be read or written simultaneously with a single system call.
+- A `Line` now just contains the reference to the Chip and the offset number. No system call is incurred when one is created.
+- Information about an individual line is now represented by a separate `LineInfo` struct which can be obtained from the function `Line::info()`. This incurs a system call to retrieve the information.
+- Creating a `Line` can't fail unless the caller specifies an offset that is out of range of the chip. 
+- The `LineIterator` can not fail since it checks the offset range. So now its item is just a `Line`, and not `Result<Line>`.
+- There was no longer a need for `Line::refresh()` so it was removed.
+- Since a `Line` object is trivial to create, it is now OK to have `Lines` be a simple collection of `Line` structs.
+
+## v0.1.0 - 2018-09-28
 
 - Initial release of the library with basic operations centered around operating
   on a single line at a time.

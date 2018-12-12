@@ -31,25 +31,25 @@ fn main() {
                 chip.num_lines()
             );
             for line in chip.lines() {
-                match line {
-                    Ok(line) => {
+                match line.info() {
+                    Ok(info) => {
                         let mut flags = vec![];
 
-                        if line.is_kernel() {
+                        if info.is_kernel() {
                             flags.push("kernel");
                         }
 
-                        if line.direction() == LineDirection::Out {
+                        if info.direction() == LineDirection::Out {
                             flags.push("output");
                         }
 
-                        if line.is_active_low() {
+                        if info.is_active_low() {
                             flags.push("active-low");
                         }
-                        if line.is_open_drain() {
+                        if info.is_open_drain() {
                             flags.push("open-drain");
                         }
-                        if line.is_open_source() {
+                        if info.is_open_source() {
                             flags.push("open-source");
                         }
 
@@ -61,15 +61,16 @@ fn main() {
 
                         println!(
                             "\tline {lineno:>3}: {name} {consumer} {usage}",
-                            lineno = line.offset(),
-                            name = line.name().unwrap_or("unused"),
-                            consumer = line.consumer().unwrap_or("unused"),
+                            lineno = info.line().offset(),
+                            name = info.name().unwrap_or("unused"),
+                            consumer = info.consumer().unwrap_or("unused"),
                             usage = usage,
                         );
                     }
-                    Err(e) => println!("\tError getting line: {:?}", e),
+                    Err(e) => println!("\tError getting line info: {:?}", e),
                 }
             }
+            println!();
         }
     }
 }

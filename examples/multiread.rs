@@ -12,38 +12,22 @@ extern crate quicli;
 
 use gpio_cdev::*;
 use quicli::prelude::*;
-use std::thread::sleep;
-use std::time::{Duration, Instant};
 
 #[derive(Debug, StructOpt)]
 struct Cli {
     /// The gpiochip device (e.g. /dev/gpiochip0)
     chip: String,
-    /// The offset of the GPIO line for the provided chip
-    line: u32,
-    /// Period in milliseconds
-    period_ms: u64,
-    /// Duration over which to blink in milliseconds
-    duration_ms: u64,
+    /// The offset of the GPIO lines for the provided chip
+    lines: Vec<u32>,
 }
 
 fn do_main(args: Cli) -> errors::Result<()> {
     let mut chip = Chip::new(args.chip)?;
-
-    // NOTE: we set the default value to the desired state so
-    // setting it separately is not required
+    let ini_vals = vec![ 0; args.lines.len() ];
     let handle = chip
-        .get_line(args.line)?
-        .request(LineRequestFlags::OUTPUT, 1, "blinky")?;
-
-    let duration = Duration::from_millis(args.duration_ms);
-    let start_time = Instant::now();
-    while start_time.elapsed() < duration {
-        sleep(Duration::from_millis(args.period_ms));
-        handle.set_value(0)?;
-        sleep(Duration::from_millis(args.period_ms));
-        handle.set_value(1)?;
-    }
+        .get_lines(&args.lines)?
+        .request(LineRequestFlags::INPUT, &ini_vals, "multiread")?;
+    println!("Values: {:?}", handle.get_values()?);
 
     Ok(())
 }

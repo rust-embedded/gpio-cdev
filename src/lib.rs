@@ -96,6 +96,7 @@ use std::path::{Path, PathBuf};
 use std::ptr;
 use std::slice;
 use std::sync::Arc;
+use std::ops::Index;
 
 pub mod errors;
 mod ffi;
@@ -255,6 +256,21 @@ impl Chip {
         Line::new(self.inner.clone(), offset)
     }
 
+    /// Get a handle to multiple GPIO line at a given offsets
+    ///
+    /// The group of lines can be manipulated simultaneously.
+    pub fn get_lines(&mut self, offsets: &[u32]) -> Result<Lines> {
+        Lines::new(self.inner.clone(), offsets)
+    }
+
+    /// Get a handle to all the GPIO lines on the chip
+    ///
+    /// The group of lines can be manipulated simultaneously.
+    pub fn get_all_lines(&mut self) -> Result<Lines> {
+        let offsets: Vec<u32> = (0..self.num_lines()).collect();
+        self.get_lines(&offsets)
+    }
+
     /// Get an interator over all lines that can be potentially access for this
     /// chip.
     pub fn lines(&self) -> LineIterator {
@@ -272,22 +288,21 @@ pub struct LineIterator {
 }
 
 impl Iterator for LineIterator {
-    type Item = Result<Line>;
+    type Item = Line;
 
-    fn next(&mut self) -> Option<Result<Line>> {
+    fn next(&mut self) -> Option<Line> {
         if self.idx < self.chip.lines {
-            // always increment; we don't want to error forever
-            // if we can't get some of the lines.
             let idx = self.idx;
             self.idx += 1;
-            Some(Line::new(self.chip.clone(), idx))
+            // Since we checked the index, we know this will be Ok
+            Some(Line::new(self.chip.clone(), idx).unwrap())
         } else {
             None
         }
     }
 }
 
-/// Information about and access to a specific GPIO Line
+/// Access to a specific GPIO Line
 ///
 /// GPIO Lines must be obtained through a parent [`Chip`] and
 /// represent an actual GPIO pin/line accessible via that chip.
@@ -295,13 +310,20 @@ impl Iterator for LineIterator {
 /// map to hardware depending on how the board is setup
 /// in the kernel.
 ///
-/// Wraps kernel [`struct gpioline_info`].
-///
-/// [`struct gpioline_info`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L36
 #[derive(Debug, Clone)]
 pub struct Line {
     chip: Arc<Box<InnerChip>>,
     offset: u32,
+}
+
+/// Information about a specific GPIO Line
+///
+/// Wraps kernel [`struct gpioline_info`].
+///
+/// [`struct gpioline_info`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L36
+#[derive(Debug, Clone)]
+pub struct LineInfo {
+    line: Line,
     flags: LineFlags,
     name: Option<String>,
     consumer: Option<String>,
@@ -367,87 +389,36 @@ unsafe fn cstrbuf_to_string(buf: &[libc::c_char]) -> Option<String> {
 
 impl Line {
     fn new(chip: Arc<Box<InnerChip>>, offset: u32) -> Result<Line> {
+        if offset >= chip.lines {
+            bail!("Offset out of range")
+        }
+        Ok(Line { chip, offset, })
+    }
+
+    /// Get info about the line from the kernel.
+    pub fn info(&self) -> Result<LineInfo> {
         let mut line_info = ffi::gpioline_info {
-            line_offset: offset,
+            line_offset: self.offset,
             flags: 0,
             name: [0; 32],
             consumer: [0; 32],
         };
         let _ = unsafe {
-            ffi::gpio_get_lineinfo_ioctl(chip.file.as_raw_fd(), &mut line_info)
+            ffi::gpio_get_lineinfo_ioctl(self.chip.file.as_raw_fd(), &mut line_info)
                 .chain_err(|| "lineinfo ioctl failed")?
         };
 
-        Ok(Line {
-            chip: chip,
-            offset: offset,
+        Ok(LineInfo {
+            line: self.clone(),
             flags: LineFlags::from_bits_truncate(line_info.flags),
             name: unsafe { cstrbuf_to_string(&line_info.name[..]) },
             consumer: unsafe { cstrbuf_to_string(&line_info.consumer[..]) },
         })
     }
 
-    /// Refresh the cached line info from the kernel
-    pub fn refresh(self) -> Result<Line> {
-        Line::new(self.chip, self.offset)
-    }
-
     /// Offset of this line within its parent chip
     pub fn offset(&self) -> u32 {
         self.offset
-    }
-
-    /// Name assigned to this chip if assigned
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_ref().map(|s| s.as_str())
-    }
-
-    /// The name of this GPIO line, such as the output pin of the line on the
-    /// chip, a rail or a pin header name on a board, as specified by the gpio
-    /// chip.
-    pub fn consumer(&self) -> Option<&str> {
-        self.consumer.as_ref().map(|s| s.as_str())
-    }
-
-    /// True if the any flags for the device are set (input or output)
-    pub fn is_used(&self) -> bool {
-        !self.flags.is_empty()
-    }
-
-    /// True if this line is being used by something else in the kernel
-    ///
-    /// If another driver or subsystem in the kernel is using the line
-    /// then it cannot be used via the cdev interface. See [relevant kernel code].
-    ///
-    /// [relevant kernel code]: https://elixir.bootlin.com/linux/v4.9.127/source/drivers/gpio/gpiolib.c#L938
-    pub fn is_kernel(&self) -> bool {
-        self.flags.contains(LineFlags::KERNEL)
-    }
-
-    /// True if this line is marked as active low in the kernel
-    pub fn is_active_low(&self) -> bool {
-        self.flags.contains(LineFlags::ACTIVE_LOW)
-    }
-
-    /// True if this line is marked as open drain in the kernel
-    pub fn is_open_drain(&self) -> bool {
-        self.flags.contains(LineFlags::OPEN_DRAIN)
-    }
-
-    /// True if this line is marked as open source in the kernel
-    pub fn is_open_source(&self) -> bool {
-        self.flags.contains(LineFlags::OPEN_SOURCE)
-    }
-
-    /// Get the direction of this GPIO if configured
-    ///
-    /// Lines are considered to be inputs if not explicitly
-    /// marked as outputs in the line info flags by the kernel.
-    pub fn direction(&self) -> LineDirection {
-        match self.flags.contains(LineFlags::IS_OUT) {
-            true => LineDirection::Out,
-            false => LineDirection::In,
-        }
     }
 
     /// Get a handle to this chip's parent
@@ -512,7 +483,7 @@ impl Line {
                 .chain_err(|| "linehandle request ioctl failed")?
         };
         Ok(LineHandle {
-            line: self.clone().refresh()?, // TODO: revisit
+            line: self.clone(),
             flags: flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
@@ -582,11 +553,71 @@ impl Line {
         };
 
         Ok(LineEventHandle {
-            line: self.clone().refresh()?, // TODO: revisit
+            line: self.clone(),
             handle_flags,
             event_flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
+    }
+}
+
+impl LineInfo {
+    /// Get a handle to the line that this info represents
+    pub fn line(&self) -> &Line {
+        &self.line
+    }
+
+    /// Name assigned to this chip if assigned
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|s| s.as_str())
+    }
+
+    /// The name of this GPIO line, such as the output pin of the line on the
+    /// chip, a rail or a pin header name on a board, as specified by the gpio
+    /// chip.
+    pub fn consumer(&self) -> Option<&str> {
+        self.consumer.as_ref().map(|s| s.as_str())
+    }
+
+    /// Get the direction of this GPIO if configured
+    ///
+    /// Lines are considered to be inputs if not explicitly
+    /// marked as outputs in the line info flags by the kernel.
+    pub fn direction(&self) -> LineDirection {
+        match self.flags.contains(LineFlags::IS_OUT) {
+            true => LineDirection::Out,
+            false => LineDirection::In,
+        }
+    }
+
+    /// True if the any flags for the device are set (input or output)
+    pub fn is_used(&self) -> bool {
+        !self.flags.is_empty()
+    }
+
+    /// True if this line is being used by something else in the kernel
+    ///
+    /// If another driver or subsystem in the kernel is using the line
+    /// then it cannot be used via the cdev interface. See [relevant kernel code].
+    ///
+    /// [relevant kernel code]: https://elixir.bootlin.com/linux/v4.9.127/source/drivers/gpio/gpiolib.c#L938
+    pub fn is_kernel(&self) -> bool {
+        self.flags.contains(LineFlags::KERNEL)
+    }
+
+    /// True if this line is marked as active low in the kernel
+    pub fn is_active_low(&self) -> bool {
+        self.flags.contains(LineFlags::ACTIVE_LOW)
+    }
+
+    /// True if this line is marked as open drain in the kernel
+    pub fn is_open_drain(&self) -> bool {
+        self.flags.contains(LineFlags::OPEN_DRAIN)
+    }
+
+    /// True if this line is marked as open source in the kernel
+    pub fn is_open_source(&self) -> bool {
+        self.flags.contains(LineFlags::OPEN_SOURCE)
     }
 }
 
@@ -657,6 +688,193 @@ impl AsRawFd for LineHandle {
         self.file.as_raw_fd()
     }
 }
+
+/// A collection of lines that can be accesses simultaneously
+///
+/// This is a collection of lines, all from the same GPIO chip that can
+/// all be accessed simultaneously
+#[derive(Debug)]
+pub struct Lines {
+    lines: Vec<Line>,
+}
+
+impl Lines {
+    fn new(chip: Arc<Box<InnerChip>>, offsets: &[u32]) -> Result<Lines> {
+        let res: Result<Vec<Line>> = offsets.iter()
+            .map(|off| Line::new(chip.clone(), *off))
+            .collect();
+        let lines = res?;
+        Ok(Lines { lines, })
+    }
+
+    /// Get a handle to the parent chip for the lines
+    pub fn chip(&self) -> Chip {
+        self.lines[0].chip()
+    }
+
+    /// Get the number of lines in the collection
+    pub fn len(&self) -> usize {
+        self.lines.len()
+    }
+
+    /// Request access to interact with these lines from the kernel
+    ///
+    /// This is similar to the "export" operation present in the sysfs
+    /// API with the key difference that we are also able to configure
+    /// the GPIO with `flags` to specify how the line will be used
+    /// at the time of request.
+    ///
+    /// For an output, the `default` parameter specifies the value
+    /// each line should have when it is configured as an output.  The
+    /// `consumer` string should describe the process consuming the
+    /// line (this will be truncated to 31 characters if too long).
+    ///
+    /// # Errors
+    ///
+    /// The main source of errors here is if the kernel returns an
+    /// error to the ioctl performing the request here.  This will
+    /// result in an [`Error`] being returned with [`ErrorKind::Io`].
+    ///
+    /// One possible cause for an error here would be if the lines are
+    /// already in use.  One can check for this prior to making the
+    /// request using [`is_kernel`].
+    ///
+    /// [`Error`]: errors/struct.Error.html
+    /// [`ErrorKind::Io`]: errors/enum.ErrorKind.html#variant.Io
+    /// [`is_kernel`]: struct.Line.html#method.is_kernel
+    pub fn request(
+        &self,
+        flags: LineRequestFlags,
+        default: &[u8],
+        consumer: &str,
+    ) -> Result<MultiLineHandle> {
+        let n = self.lines.len();
+        if default.len() != n {
+            bail!(nix::Error::Sys(nix::errno::Errno::EINVAL));
+        }
+        // prepare the request; the kernel consumes some of these values and will
+        // set the fd for us.
+        let mut request = ffi::gpiohandle_request {
+            lineoffsets: unsafe { mem::zeroed() },
+            flags: flags.bits(),
+            default_values: unsafe { mem::zeroed() },
+            consumer_label: unsafe { mem::zeroed() },
+            lines: n as u32,
+            fd: 0,
+        };
+        for i in 0..n {
+            request.lineoffsets[i] = self.lines[i].offset();
+            request.default_values[i] = default[i];
+        }
+        unsafe {
+            rstr_lcpy(
+                request.consumer_label[..].as_mut_ptr(),
+                consumer,
+                request.consumer_label.len(),
+            )
+        };
+        unsafe {
+            ffi::gpio_get_linehandle_ioctl(self.lines[0].chip().inner.file.as_raw_fd(), &mut request)
+                .chain_err(|| "linehandle request ioctl failed")?
+        };
+        let lines = self.lines.clone();
+        Ok(MultiLineHandle {
+            lines: Lines { lines, },
+            flags: flags,
+            file: unsafe { File::from_raw_fd(request.fd) },
+        })
+    }
+}
+
+impl Index<usize> for Lines {
+    type Output = Line;
+
+    fn index(&self, i: usize) -> &Line {
+        &self.lines[i]
+    }
+}
+
+/// Handle for interacting with a "requested" line
+///
+/// In order for userspace to read/write the value of a GPIO
+/// it must be requested from the chip using [`Line::request`].
+/// On success, the kernel creates an anonymous file descriptor
+/// for interacting with the requested line.  This structure
+/// is the go-between for callers and that file descriptor.
+///
+/// [`Line::request`]: struct.Line.html#method.request
+#[derive(Debug)]
+pub struct MultiLineHandle {
+    lines: Lines,
+    flags: LineRequestFlags,
+    file: File,
+}
+
+impl MultiLineHandle {
+    /// Request the current state of this Line from the kernel
+    ///
+    /// This call is expected to succeed for both input and output
+    /// lines.  It should be noted, however, that some drivers may
+    /// not be able to give any useful information when the value
+    /// is requested for an output line.
+    ///
+    /// This value should be 0 or 1 which a "1" representing that
+    /// the line is active.  Usually this means that the line is
+    /// at logic-level high but it could mean the opposite if the
+    /// line has been marked as being ACTIVE_LOW.
+    pub fn get_values(&self) -> Result<Vec<u8>> {
+        let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
+        let _ = unsafe {
+            ffi::gpiohandle_get_line_values_ioctl(self.file.as_raw_fd(), &mut data)
+                .chain_err(|| "getting line value failed")?
+        };
+        let n = self.num_lines();
+        let values: Vec<u8> = (0..n).map(|i| data.values[i]).collect();
+        Ok(values)
+    }
+
+    /// Request that the line be driven to the specified value
+    ///
+    /// The value should be 0 or 1 with 1 representing a request
+    /// to make the line "active".  Usually "active" means
+    /// logic level high unless the line has been marked as ACTIVE_LOW.
+    ///
+    /// Calling `set_value` on a line that is not an output will
+    /// likely result in an error (from the kernel).
+    pub fn set_values(&self, values: &[u8]) -> Result<()> {
+        let n = self.num_lines();
+        if values.len() != n {
+            bail!(nix::Error::Sys(nix::errno::Errno::EINVAL));
+        }
+        let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
+        for i in 0..n {
+            data.values[i] = values[i];
+        }
+        let _ = unsafe {
+            ffi::gpiohandle_set_line_values_ioctl(self.file.as_raw_fd(), &mut data)
+                .chain_err(|| "setting line value failed")?
+        };
+        Ok(())
+    }
+
+    /// Get the number of lines associated with this handle
+    pub fn num_lines(&self) -> usize {
+        self.lines.len()
+    }
+
+    /// Get the Line information associated with this handle.
+    pub fn lines(&self) -> &Lines {
+        &self.lines
+    }
+}
+
+impl AsRawFd for MultiLineHandle {
+    /// Gets the raw file descriptor for the LineHandle.
+    fn as_raw_fd(&self) -> RawFd {
+        self.file.as_raw_fd()
+    }
+}
+
 
 /// Did the Line rise (go active) or fall (go inactive)?
 ///
@@ -798,3 +1016,4 @@ impl Iterator for LineEventHandle {
         }
     }
 }
+
