@@ -23,7 +23,7 @@ Add the following to your Cargo.toml
 
 ```
 [dependencies]
-gpio-cdev = "0.1"
+gpio-cdev = "0.2"
 ```
 
 ## Examples
