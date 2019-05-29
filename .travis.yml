@@ -10,6 +10,12 @@ env:
   global:
     - CRATE_NAME=gpio-cdev
 
+branches:
+  only:
+    - master
+    - staging
+    - trying
+
 matrix:
   # TODO These are all the build jobs. Adjust as necessary. Comment out what you
   # don't need
@@ -29,24 +35,40 @@ matrix:
 
     # Linux
     - env: TARGET=aarch64-unknown-linux-gnu
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
     - env: TARGET=arm-unknown-linux-gnueabi
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
     - env: TARGET=armv7-unknown-linux-gnueabihf
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
     - env: TARGET=i686-unknown-linux-gnu
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
     - env: TARGET=i686-unknown-linux-musl
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
     - env: TARGET=mips-unknown-linux-gnu
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
     - env: TARGET=mips64-unknown-linux-gnuabi64
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
     - env: TARGET=mips64el-unknown-linux-gnuabi64
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
     - env: TARGET=mipsel-unknown-linux-gnu
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
     - env: TARGET=powerpc-unknown-linux-gnu
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
     - env: TARGET=powerpc64-unknown-linux-gnu
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
     - env: TARGET=powerpc64le-unknown-linux-gnu
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
     - env: TARGET=s390x-unknown-linux-gnu DISABLE_TESTS=1
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
     - env: TARGET=x86_64-unknown-linux-gnu
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
     - env: TARGET=x86_64-unknown-linux-musl
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
 
     # Testing other channels
     - env: TARGET=x86_64-unknown-linux-gnu
       rust: nightly
+      if: (branch = staging OR branch = trying) OR (type = pull_request AND branch = master)
 
 before_install:
   - set -e
