@@ -15,7 +15,7 @@ use quicli::prelude::*;
 use nix::poll::*;
 use std::os::unix::io::{AsRawFd};
 
-type PollEventFlags = nix::poll::EventFlags;
+type PollEventFlags = nix::poll::PollFlags;
 
 #[derive(Debug, StructOpt)]
 struct Cli {
