@@ -1,8 +1,8 @@
-# rust-gpio-cdev
+# gpio-cdev
 
-[![Build Status](https://travis-ci.org/posborne/rust-gpio-cdev.svg?branch=master)](https://travis-ci.org/posborne/rust-gpio-cdev)
+[![Build Status](https://travis-ci.org/rust-embedded/gpio-cdev.svg?branch=master)](https://travis-ci.org/rust-embedded/gpio-cdev)
 [![Version](https://img.shields.io/crates/v/gpio-cdev.svg)](https://crates.io/crates/gpio-cdev)
-[![License](https://img.shields.io/crates/l/gpio-cdev.svg)](https://github.com/posborne/rust-gpio-cdev/blob/master/README.md#license)
+[![License](https://img.shields.io/crates/l/gpio-cdev.svg)](https://github.com/rust-embedded/gpio-cdev/blob/master/README.md#license)
 
 - [API Documentation](https://docs.rs/gpio-cdev)
 
