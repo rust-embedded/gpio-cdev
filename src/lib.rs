@@ -96,7 +96,7 @@ use std::path::{Path, PathBuf};
 use std::ptr;
 use std::slice;
 use std::sync::Arc;
-use std::ops::Index;
+use std::ops::{Index, Range};
 
 pub mod errors;
 mod ffi;
@@ -259,16 +259,29 @@ impl Chip {
     /// Get a handle to multiple GPIO line at a given offsets
     ///
     /// The group of lines can be manipulated simultaneously.
+    /// This will fail if attempting to get more than GPIOHANDLES_MAX
+    /// (64) lines.
     pub fn get_lines(&mut self, offsets: &[u32]) -> Result<Lines> {
         Lines::new(self.inner.clone(), offsets)
+    }
+
+    /// Get a handle to a range of GPIO lines on the chip
+    ///
+    /// The group of lines can be manipulated simultaneously.
+    /// This will fail if attempting to get more than GPIOHANDLES_MAX
+    /// (64) lines.
+    pub fn get_range_lines(&mut self, r: Range<u32>) -> Result<Lines> {
+        let offsets: Vec<u32> = r.collect();
+        self.get_lines(&offsets)
     }
 
     /// Get a handle to all the GPIO lines on the chip
     ///
     /// The group of lines can be manipulated simultaneously.
+    /// This will fail if the chip has more than GPIOHANDLES_MAX
+    /// (64) lines.
     pub fn get_all_lines(&mut self) -> Result<Lines> {
-        let offsets: Vec<u32> = (0..self.num_lines()).collect();
-        self.get_lines(&offsets)
+        self.get_range_lines(0..self.num_lines())
     }
 
     /// Get an interator over all lines that can be potentially access for this
@@ -699,7 +712,12 @@ pub struct Lines {
 }
 
 impl Lines {
+    pub const MAX_LINES: usize = ffi::GPIOHANDLES_MAX;
+
     fn new(chip: Arc<Box<InnerChip>>, offsets: &[u32]) -> Result<Lines> {
+        if offsets.len() == 0 || offsets.len() > Lines::MAX_LINES {
+            bail!(nix::Error::Sys(nix::errno::Errno::EINVAL));
+        }
         let res: Result<Vec<Line>> = offsets.iter()
             .map(|off| Line::new(chip.clone(), *off))
             .collect();

@@ -10,6 +10,7 @@ extern crate gpio_cdev;
 #[macro_use]
 extern crate quicli;
 
+use std::cmp::min;
 use gpio_cdev::*;
 use quicli::prelude::*;
 
@@ -21,11 +22,45 @@ struct Cli {
 
 fn do_main(args: Cli) -> errors::Result<()> {
     let mut chip = Chip::new(args.chip)?;
-    let ini_vals = vec![ 0; chip.num_lines() as usize ];
-    let handle = chip
-        .get_all_lines()?
-        .request(LineRequestFlags::INPUT, &ini_vals, "readall")?;
-    println!("Values: {:?}", handle.get_values()?);
+    let nlines = chip.num_lines() as usize;
+
+    println!("Found {:?} with {} lines.", chip.path(), nlines);
+
+    // Note that the kernel has a hard limit of 64 lines in a request.
+    // That presents a limit to the size of a Lines struct.
+    // So chip.get_all_lines() will fail if the chip has more than 64
+    // lines. In that case we can read smaller blocks of lines, or
+    // one at a time.
+
+    match chip.get_all_lines() {
+        Ok(lines) => {
+            let ini_vals = vec![ 0; nlines ];
+            let handle = lines.request(LineRequestFlags::INPUT, &ini_vals, "readall")?;
+            let values = handle.get_values()?;
+            println!("{:?}", values);
+        }
+        Err(_err) => {
+            let mut nread: usize = 0;
+
+            // Block size can be 1 to Lines::MAX_LINES (64)
+            let block_sz: usize = 4;
+
+            while nread < nlines {
+                let n = min(block_sz, nlines-nread);
+                let istart = nread as u32;
+                let iend = istart + n as u32;
+                let ini_vals = vec![ 0; n ];
+
+                let handle = chip
+                    .get_range_lines(istart..iend)?
+                    .request(LineRequestFlags::INPUT, &ini_vals, "readall")?;
+
+                let values = handle.get_values()?;
+                println!("({}) {:?}", istart, values);
+                nread += n;
+            }
+        }
+    }
 
     Ok(())
 }
