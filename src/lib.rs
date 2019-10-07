@@ -335,7 +335,7 @@ pub struct LineInfo {
 ///
 /// [`GPIOHANDLE_REQUEST_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L58
 bitflags! {
-    pub struct LineRequestFlags: libc::uint32_t {
+    pub struct LineRequestFlags: u32 {
         const INPUT = (1 << 0);
         const OUTPUT = (1 << 1);
         const ACTIVE_LOW = (1 << 2);
@@ -350,7 +350,7 @@ bitflags! {
 ///
 /// [`GPIOEVENT_REQUEST_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L109
 bitflags! {
-    pub struct EventRequestFlags: libc::uint32_t {
+    pub struct EventRequestFlags: u32 {
         const RISING_EDGE = (1 << 0);
         const FALLING_EDGE = (1 << 1);
         const BOTH_EDGES = Self::RISING_EDGE.bits | Self::FALLING_EDGE.bits;
@@ -363,7 +363,7 @@ bitflags! {
 ///
 /// [`GPIOLINE_FLAG_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L29
 bitflags! {
-    pub struct LineFlags: libc::uint32_t {
+    pub struct LineFlags: u32 {
         const KERNEL = (1 << 0);
         const IS_OUT = (1 << 1);
         const ACTIVE_LOW = (1 << 2);
