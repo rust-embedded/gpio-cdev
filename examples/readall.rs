@@ -10,7 +10,7 @@ extern crate gpio_cdev;
 #[macro_use]
 extern crate quicli;
 
-use gpio_cdev::*;
+use gpio_cdev::{Chip, LineRequestFlags};
 use quicli::prelude::*;
 
 #[derive(Debug, StructOpt)]
@@ -19,7 +19,7 @@ struct Cli {
     chip: String,
 }
 
-fn do_main(args: Cli) -> errors::Result<()> {
+fn do_main(args: Cli) -> Result<()> {
     let mut chip = Chip::new(args.chip)?;
     let ini_vals = vec![ 0; chip.num_lines() as usize ];
     let handle = chip
