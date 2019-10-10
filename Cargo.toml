@@ -12,7 +12,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 bitflags = "1.0"
-error-chain = "0.12"
+failure = "0.1"
 libc = "0.2"
 nix = "0.14"
 
