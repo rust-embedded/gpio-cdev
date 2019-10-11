@@ -26,10 +26,12 @@
 //! state to another line/pin.
 //!
 //! ```no_run
+//! # extern crate failure;
+//! # type Result<T> = failure::Fallible<T>;
 //! use gpio_cdev::{Chip, LineRequestFlags, EventRequestFlags, EventType};
 //!
 //! // Lines are offset within gpiochip0; see docs for more info on chips/lines
-//! fn mirror_gpio(inputline: u32, outputline: u32) -> gpio_cdev::errors::Result<()> {
+//! fn mirror_gpio(inputline: u32, outputline: u32) -> Result<()> {
 //!     let mut chip = Chip::new("/dev/gpiochip0")?;
 //!     let input = chip.get_line(inputline)?;
 //!     let output = chip.get_line(outputline)?;
@@ -54,7 +56,7 @@
 //!     Ok(())
 //! }
 //!
-//! # fn main() -> gpio_cdev::errors::Result<()> {
+//! # fn main() -> Result<()> {
 //! #     mirror_gpio(0, 1)
 //! # }
 //! ```
@@ -62,9 +64,11 @@
 //! To get the state of a GPIO Line on a given chip:
 //!
 //! ```no_run
+//! # extern crate failure;
+//! # type Result<T> = failure::Fallible<T>;
 //! use gpio_cdev::{Chip, LineRequestFlags};
 //!
-//! # fn main() -> gpio_cdev::errors::Result<()> {
+//! # fn main() -> Result<()> {
 //! // Read the state of GPIO4 on a raspberry pi.  /dev/gpiochip0
 //! // maps to the driver for the SoC (builtin) GPIO controller.
 //! let mut chip = Chip::new("/dev/gpiochip0")?;
@@ -86,7 +90,7 @@ extern crate libc;
 extern crate nix;
 extern crate failure;
 
-use failure::{bail, Error, ResultExt};
+use failure::{bail, Fallible, ResultExt};
 use std::cmp::min;
 use std::ffi::CStr;
 use std::fs::{read_dir, File, ReadDir};
@@ -98,10 +102,9 @@ use std::ptr;
 use std::slice;
 use std::sync::Arc;
 
-//pub mod errors;
 mod ffi;
 
-type Result<T> = std::result::Result<T, Error>;
+type Result<T> = Fallible<T>;
 
 unsafe fn rstr_lcpy(dst: *mut libc::c_char, src: &str, length: usize) {
     let copylen = min(src.len() + 1, length);
@@ -510,10 +513,12 @@ impl Line {
     /// # Example
     ///
     /// ```no_run
+    /// # extern crate failure;
+    /// # type Result<T> = failure::Fallible<T>;
     /// use gpio_cdev::*;
     ///
     /// # use std::io;
-    /// # fn main() -> errors::Result<()> {
+    /// # fn main() -> Result<()> {
     /// let mut chip = Chip::new("/dev/gpiochip0")?;
     /// let input = chip.get_line(0)?;
     ///
