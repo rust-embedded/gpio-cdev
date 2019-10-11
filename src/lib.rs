@@ -104,7 +104,7 @@ use std::sync::Arc;
 
 mod ffi;
 
-type Result<T> = Fallible<T>;
+pub type Result<T> = Fallible<T>;
 
 unsafe fn rstr_lcpy(dst: *mut libc::c_char, src: &str, length: usize) {
     let copylen = min(src.len() + 1, length);
