@@ -10,7 +10,7 @@
 
 extern crate gpio_cdev;
 
-use gpio_cdev::*;
+use gpio_cdev::{chips, LineDirection};
 
 fn main() {
     let chip_iterator = match chips() {

@@ -10,7 +10,7 @@ extern crate gpio_cdev;
 #[macro_use]
 extern crate quicli;
 
-use gpio_cdev::*;
+use gpio_cdev::{Chip, LineRequestFlags};
 use quicli::prelude::*;
 use std::thread::sleep;
 use std::time::{Duration, Instant};

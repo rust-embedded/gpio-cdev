@@ -8,12 +8,13 @@
 
 extern crate gpio_cdev;
 extern crate nix;
-#[macro_use] extern crate quicli;
+#[macro_use]
+extern crate quicli;
 
-use gpio_cdev::*;
-use quicli::prelude::*;
+use gpio_cdev::{Chip, EventRequestFlags, LineEventHandle, LineRequestFlags};
 use nix::poll::*;
-use std::os::unix::io::{AsRawFd};
+use quicli::prelude::*;
+use std::os::unix::io::AsRawFd;
 
 type PollEventFlags = nix::poll::PollFlags;
 
@@ -29,23 +30,36 @@ fn do_main(args: Cli) -> Result<()> {
     let mut chip = Chip::new(args.chip)?;
 
     // Get event handles for each line to monitor.
-    let mut evt_handles: Vec<LineEventHandle> = args.lines.into_iter().map(|off| {
-        let line = chip.get_line(off).unwrap();
-        line.events(LineRequestFlags::INPUT, EventRequestFlags::BOTH_EDGES,
-                          "monitor").unwrap()
-    }).collect();
+    let mut evt_handles: Vec<LineEventHandle> = args
+        .lines
+        .into_iter()
+        .map(|off| {
+            let line = chip.get_line(off).unwrap();
+            line.events(
+                LineRequestFlags::INPUT,
+                EventRequestFlags::BOTH_EDGES,
+                "monitor",
+            )
+            .unwrap()
+        })
+        .collect();
 
     // Create a vector of file descriptors for polling
-    let mut pollfds: Vec<PollFd> = evt_handles.iter().map(|h| {
-        PollFd::new(h.as_raw_fd(), PollEventFlags::POLLIN | PollEventFlags::POLLPRI)
-    }).collect();
+    let mut pollfds: Vec<PollFd> = evt_handles
+        .iter()
+        .map(|h| {
+            PollFd::new(
+                h.as_raw_fd(),
+                PollEventFlags::POLLIN | PollEventFlags::POLLPRI,
+            )
+        })
+        .collect();
 
     loop {
         // poll for an event on any of the lines
         if poll(&mut pollfds, -1)? == 0 {
             println!("Timeout?!?");
-        }
-        else {
+        } else {
             for i in 0..pollfds.len() {
                 if let Some(revts) = pollfds[i].revents() {
                     let h = &mut evt_handles[i];
@@ -58,9 +72,8 @@ fn do_main(args: Cli) -> Result<()> {
                         // to read the value of the bit.
                         let val = h.get_value()?;
                         println!("    {}", val);
-                    }
-                    else if revts.contains(PollEventFlags::POLLPRI) {
-                         println!("[{}] Got a POLLPRI", h.line().offset());
+                    } else if revts.contains(PollEventFlags::POLLPRI) {
+                        println!("[{}] Got a POLLPRI", h.line().offset());
                     }
                 }
             }
@@ -70,7 +83,7 @@ fn do_main(args: Cli) -> Result<()> {
 
 main!(|args: Cli| {
     match do_main(args) {
-        Ok(()) => {},
+        Ok(()) => {}
         Err(e) => {
             println!("Error: {:?}", e);
         }

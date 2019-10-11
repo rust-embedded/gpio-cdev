@@ -10,7 +10,7 @@ extern crate gpio_cdev;
 #[macro_use]
 extern crate quicli;
 
-use gpio_cdev::*;
+use gpio_cdev::{Chip, EventRequestFlags, LineRequestFlags};
 use quicli::prelude::*;
 
 #[derive(Debug, StructOpt)]
