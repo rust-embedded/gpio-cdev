@@ -27,7 +27,7 @@ struct Cli {
     sleeptime: u64,
 }
 
-fn do_main(args: Cli) -> errors::Result<()> {
+fn do_main(args: Cli) -> Result<()> {
     let mut chip = Chip::new(args.chip)?;
     let input = chip.get_line(args.inputline)?;
     let output = chip.get_line(args.outputline)?;

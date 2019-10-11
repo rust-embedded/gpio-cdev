@@ -21,7 +21,7 @@ struct Cli {
     line: u32,
 }
 
-fn do_main(args: Cli) -> errors::Result<()> {
+fn do_main(args: Cli) -> Result<()> {
     let mut chip = Chip::new(args.chip)?;
     let handle = chip
         .get_line(args.line)?

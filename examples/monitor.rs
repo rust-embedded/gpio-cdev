@@ -25,7 +25,7 @@ struct Cli {
     lines: Vec<u32>,
 }
 
-fn do_main(args: Cli) -> errors::Result<()> {
+fn do_main(args: Cli) -> Result<()> {
     let mut chip = Chip::new(args.chip)?;
 
     // Get event handles for each line to monitor.

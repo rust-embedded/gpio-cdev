@@ -21,7 +21,7 @@ struct Cli {
     lines: Vec<u32>,
 }
 
-fn do_main(args: Cli) -> errors::Result<()> {
+fn do_main(args: Cli) -> Result<()> {
     let mut chip = Chip::new(args.chip)?;
     let ini_vals = vec![ 0; args.lines.len() ];
     let handle = chip
