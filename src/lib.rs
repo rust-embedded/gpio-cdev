@@ -26,10 +26,11 @@
 //! state to another line/pin.
 //!
 //! ```no_run
+//! # type Result<T> = std::result::Result<T, gpio_cdev::errors::Error>;
 //! use gpio_cdev::{Chip, LineRequestFlags, EventRequestFlags, EventType};
 //!
 //! // Lines are offset within gpiochip0; see docs for more info on chips/lines
-//! fn mirror_gpio(inputline: u32, outputline: u32) -> gpio_cdev::errors::Result<()> {
+//! fn mirror_gpio(inputline: u32, outputline: u32) -> Result<()> {
 //!     let mut chip = Chip::new("/dev/gpiochip0")?;
 //!     let input = chip.get_line(inputline)?;
 //!     let output = chip.get_line(outputline)?;
@@ -54,7 +55,7 @@
 //!     Ok(())
 //! }
 //!
-//! # fn main() -> gpio_cdev::errors::Result<()> {
+//! # fn main() -> Result<()> {
 //! #     mirror_gpio(0, 1)
 //! # }
 //! ```
@@ -62,9 +63,10 @@
 //! To get the state of a GPIO Line on a given chip:
 //!
 //! ```no_run
+//! # type Result<T> = std::result::Result<T, gpio_cdev::errors::Error>;
 //! use gpio_cdev::{Chip, LineRequestFlags};
 //!
-//! # fn main() -> gpio_cdev::errors::Result<()> {
+//! # fn main() -> Result<()> {
 //! // Read the state of GPIO4 on a raspberry pi.  /dev/gpiochip0
 //! // maps to the driver for the SoC (builtin) GPIO controller.
 //! let mut chip = Chip::new("/dev/gpiochip0")?;
@@ -81,8 +83,6 @@
 
 #[macro_use]
 extern crate bitflags;
-#[macro_use]
-extern crate error_chain;
 extern crate libc;
 #[macro_use]
 extern crate nix;
@@ -91,12 +91,12 @@ use std::cmp::min;
 use std::ffi::CStr;
 use std::fs::{read_dir, File, ReadDir};
 use std::mem;
-use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
+use std::ops::Index;
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::slice;
 use std::sync::Arc;
-use std::ops::Index;
 
 pub mod errors;
 mod ffi;
@@ -182,20 +182,16 @@ impl Iterator for ChipIterator {
 /// Iterate over all GPIO chips currently present on this system
 pub fn chips() -> Result<ChipIterator> {
     Ok(ChipIterator {
-        readdir: read_dir("/dev").chain_err(|| "unabled to read /dev directory")?,
+        readdir: read_dir("/dev")?,
     })
 }
 
 impl Chip {
     /// Open the GPIO Chip at the provided path (e.g. `/dev/gpiochip<N>`)
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Chip> {
-        let f = File::open(path.as_ref())
-            .chain_err(|| format!("Opening chip at path {:?} failed", path.as_ref()))?;
+        let f = File::open(path.as_ref())?;
         let mut info: ffi::gpiochip_info = unsafe { mem::uninitialized() };
-        let _ = unsafe {
-            ffi::gpio_get_chipinfo_ioctl(f.as_raw_fd(), &mut info)
-                .chain_err(|| format!("Getting chip info failed for {:?}", path.as_ref()))?
-        };
+        ffi::gpio_get_chipinfo_ioctl(f.as_raw_fd(), &mut info)?;
 
         Ok(Chip {
             inner: Arc::new(Box::new(InnerChip {
@@ -390,9 +386,9 @@ unsafe fn cstrbuf_to_string(buf: &[libc::c_char]) -> Option<String> {
 impl Line {
     fn new(chip: Arc<Box<InnerChip>>, offset: u32) -> Result<Line> {
         if offset >= chip.lines {
-            bail!("Offset out of range")
+            return Err(offset_err(offset));
         }
-        Ok(Line { chip, offset, })
+        Ok(Line { chip, offset })
     }
 
     /// Get info about the line from the kernel.
@@ -403,10 +399,7 @@ impl Line {
             name: [0; 32],
             consumer: [0; 32],
         };
-        let _ = unsafe {
-            ffi::gpio_get_lineinfo_ioctl(self.chip.file.as_raw_fd(), &mut line_info)
-                .chain_err(|| "lineinfo ioctl failed")?
-        };
+        ffi::gpio_get_lineinfo_ioctl(self.chip.file.as_raw_fd(), &mut line_info)?;
 
         Ok(LineInfo {
             line: self.clone(),
@@ -444,14 +437,14 @@ impl Line {
     ///
     /// The main source of errors here is if the kernel returns an
     /// error to the ioctl performing the request here.  This will
-    /// result in an [`Error`] being returned with [`ErrorKind::Io`].
+    /// result in an [`Error`] being returned with [`ErrorKind::Ioctl`].
     ///
     /// One possible cause for an error here would be if the line is
     /// already in use.  One can check for this prior to making the
     /// request using [`is_kernel`].
     ///
     /// [`Error`]: errors/struct.Error.html
-    /// [`ErrorKind::Io`]: errors/enum.ErrorKind.html#variant.Io
+    /// [`ErrorKind::Ioctl`]: errors/enum.ErrorKind.html#variant.Ioctl
     /// [`is_kernel`]: struct.Line.html#method.is_kernel
     pub fn request(
         &self,
@@ -478,10 +471,7 @@ impl Line {
                 request.consumer_label.len(),
             )
         };
-        unsafe {
-            ffi::gpio_get_linehandle_ioctl(self.chip.file.as_raw_fd(), &mut request)
-                .chain_err(|| "linehandle request ioctl failed")?
-        };
+        ffi::gpio_get_linehandle_ioctl(self.chip.file.as_raw_fd(), &mut request)?;
         Ok(LineHandle {
             line: self.clone(),
             flags: flags,
@@ -511,7 +501,8 @@ impl Line {
     /// use gpio_cdev::*;
     ///
     /// # use std::io;
-    /// # fn main() -> errors::Result<()> {
+    /// # type Result<T> = std::result::Result<T, errors::Error>;
+    /// # fn main() -> Result<()> {
     /// let mut chip = Chip::new("/dev/gpiochip0")?;
     /// let input = chip.get_line(0)?;
     ///
@@ -547,10 +538,7 @@ impl Line {
                 request.consumer_label.len(),
             )
         };
-        unsafe {
-            ffi::gpio_get_lineevent_ioctl(self.chip.file.as_raw_fd(), &mut request)
-                .chain_err(|| "lineevent ioctl failed")?
-        };
+        ffi::gpio_get_lineevent_ioctl(self.chip.file.as_raw_fd(), &mut request)?;
 
         Ok(LineEventHandle {
             line: self.clone(),
@@ -651,10 +639,7 @@ impl LineHandle {
     /// line has been marked as being ACTIVE_LOW.
     pub fn get_value(&self) -> Result<u8> {
         let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
-        let _ = unsafe {
-            ffi::gpiohandle_get_line_values_ioctl(self.file.as_raw_fd(), &mut data)
-                .chain_err(|| "getting line value failed")?
-        };
+        ffi::gpiohandle_get_line_values_ioctl(self.file.as_raw_fd(), &mut data)?;
         Ok(data.values[0])
     }
 
@@ -669,10 +654,7 @@ impl LineHandle {
     pub fn set_value(&self, value: u8) -> Result<()> {
         let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
         data.values[0] = value;
-        let _ = unsafe {
-            ffi::gpiohandle_set_line_values_ioctl(self.file.as_raw_fd(), &mut data)
-                .chain_err(|| "setting line value failed")?
-        };
+        ffi::gpiohandle_set_line_values_ioctl(self.file.as_raw_fd(), &mut data)?;
         Ok(())
     }
 
@@ -700,11 +682,12 @@ pub struct Lines {
 
 impl Lines {
     fn new(chip: Arc<Box<InnerChip>>, offsets: &[u32]) -> Result<Lines> {
-        let res: Result<Vec<Line>> = offsets.iter()
+        let res: Result<Vec<Line>> = offsets
+            .iter()
             .map(|off| Line::new(chip.clone(), *off))
             .collect();
         let lines = res?;
-        Ok(Lines { lines, })
+        Ok(Lines { lines })
     }
 
     /// Get a handle to the parent chip for the lines
@@ -733,14 +716,14 @@ impl Lines {
     ///
     /// The main source of errors here is if the kernel returns an
     /// error to the ioctl performing the request here.  This will
-    /// result in an [`Error`] being returned with [`ErrorKind::Io`].
+    /// result in an [`Error`] being returned with [`ErrorKind::Ioctl`].
     ///
     /// One possible cause for an error here would be if the lines are
     /// already in use.  One can check for this prior to making the
     /// request using [`is_kernel`].
     ///
     /// [`Error`]: errors/struct.Error.html
-    /// [`ErrorKind::Io`]: errors/enum.ErrorKind.html#variant.Io
+    /// [`ErrorKind::Ioctl`]: errors/enum.ErrorKind.html#variant.Ioctl
     /// [`is_kernel`]: struct.Line.html#method.is_kernel
     pub fn request(
         &self,
@@ -750,7 +733,7 @@ impl Lines {
     ) -> Result<MultiLineHandle> {
         let n = self.lines.len();
         if default.len() != n {
-            bail!(nix::Error::Sys(nix::errno::Errno::EINVAL));
+            return Err(invalid_err(n, default.len()));
         }
         // prepare the request; the kernel consumes some of these values and will
         // set the fd for us.
@@ -773,13 +756,10 @@ impl Lines {
                 request.consumer_label.len(),
             )
         };
-        unsafe {
-            ffi::gpio_get_linehandle_ioctl(self.lines[0].chip().inner.file.as_raw_fd(), &mut request)
-                .chain_err(|| "linehandle request ioctl failed")?
-        };
+        ffi::gpio_get_linehandle_ioctl(self.lines[0].chip().inner.file.as_raw_fd(), &mut request)?;
         let lines = self.lines.clone();
         Ok(MultiLineHandle {
-            lines: Lines { lines, },
+            lines: Lines { lines },
             flags: flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
@@ -824,10 +804,7 @@ impl MultiLineHandle {
     /// line has been marked as being ACTIVE_LOW.
     pub fn get_values(&self) -> Result<Vec<u8>> {
         let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
-        let _ = unsafe {
-            ffi::gpiohandle_get_line_values_ioctl(self.file.as_raw_fd(), &mut data)
-                .chain_err(|| "getting line value failed")?
-        };
+        ffi::gpiohandle_get_line_values_ioctl(self.file.as_raw_fd(), &mut data)?;
         let n = self.num_lines();
         let values: Vec<u8> = (0..n).map(|i| data.values[i]).collect();
         Ok(values)
@@ -844,16 +821,13 @@ impl MultiLineHandle {
     pub fn set_values(&self, values: &[u8]) -> Result<()> {
         let n = self.num_lines();
         if values.len() != n {
-            bail!(nix::Error::Sys(nix::errno::Errno::EINVAL));
+            return Err(invalid_err(n, values.len()));
         }
         let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
         for i in 0..n {
             data.values[i] = values[i];
         }
-        let _ = unsafe {
-            ffi::gpiohandle_set_line_values_ioctl(self.file.as_raw_fd(), &mut data)
-                .chain_err(|| "setting line value failed")?
-        };
+        ffi::gpiohandle_set_line_values_ioctl(self.file.as_raw_fd(), &mut data)?;
         Ok(())
     }
 
@@ -874,7 +848,6 @@ impl AsRawFd for MultiLineHandle {
         self.file.as_raw_fd()
     }
 }
-
 
 /// Did the Line rise (go active) or fall (go inactive)?
 ///
@@ -960,11 +933,12 @@ impl LineEventHandle {
                 mem::size_of::<ffi::gpioevent_data>(),
             )
         };
-        let bytes_read = nix::unistd::read(self.file.as_raw_fd(), &mut data_as_buf)?;
+        let bytes_read =
+            nix::unistd::read(self.file.as_raw_fd(), &mut data_as_buf).map_err(event_err)?;
 
         if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
             let e = nix::Error::Sys(nix::errno::Errno::EIO);
-            Err(e.into())
+            Err(event_err(e))
         } else {
             Ok(LineEvent(data))
         }
@@ -978,7 +952,7 @@ impl LineEventHandle {
     /// line has been marked as being ACTIVE_LOW.
     pub fn get_value(&self) -> Result<u8> {
         let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
-        let _ = unsafe { ffi::gpiohandle_get_line_values_ioctl(self.file.as_raw_fd(), &mut data)? };
+        ffi::gpiohandle_get_line_values_ioctl(self.file.as_raw_fd(), &mut data)?;
         Ok(data.values[0])
     }
 
@@ -1007,13 +981,14 @@ impl Iterator for LineEventHandle {
             )
         };
         match nix::unistd::read(self.file.as_raw_fd(), &mut data_as_buf) {
-            Ok(bytes_read) => if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
-                None
-            } else {
-                Some(Ok(LineEvent(data)))
-            },
-            Err(e) => Some(Err(e.into())),
+            Ok(bytes_read) => {
+                if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
+                    None
+                } else {
+                    Some(Ok(LineEvent(data)))
+                }
+            }
+            Err(e) => Some(Err(event_err(e))),
         }
     }
 }
-

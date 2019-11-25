@@ -12,9 +12,9 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 bitflags = "1.0"
-error-chain = "0.12"
 libc = "0.2"
 nix = "0.14"
 
 [dev-dependencies]
 quicli = "0.2"
+anyhow = "1.0"

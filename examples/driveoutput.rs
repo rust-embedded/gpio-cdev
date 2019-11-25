@@ -23,7 +23,7 @@ struct Cli {
     value: u8,
 }
 
-fn do_main(args: Cli) -> errors::Result<()> {
+fn do_main(args: Cli) -> std::result::Result<(), errors::Error> {
     let mut chip = Chip::new(args.chip)?;
 
     // NOTE: we set the default value to the desired state so

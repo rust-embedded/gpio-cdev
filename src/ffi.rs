@@ -6,6 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use super::errors::IoctlKind;
 use libc;
 
 pub const GPIOHANDLES_MAX: usize = 64;
@@ -56,10 +57,52 @@ pub struct gpioevent_data {
     pub id: u32,
 }
 
-ioctl_read!(gpio_get_chipinfo_ioctl, 0xB4, 0x01, gpiochip_info);
-ioctl_readwrite!(gpio_get_lineinfo_ioctl, 0xB4, 0x02, gpioline_info);
-ioctl_readwrite!(gpio_get_linehandle_ioctl, 0xB4, 0x03, gpiohandle_request);
-ioctl_readwrite!(gpio_get_lineevent_ioctl, 0xB4, 0x04, gpioevent_request);
+macro_rules! wrap_ioctl {
+    ($ioctl_macro:ident!($name:ident, $ioty:expr, $nr:expr, $ty:ident), $ioctl_error_type:expr) => {
+        mod $name {
+            $ioctl_macro!($name, $ioty, $nr, super::$ty);
+        }
 
-ioctl_readwrite!(gpiohandle_get_line_values_ioctl, 0xB4, 0x08, gpiohandle_data);
-ioctl_readwrite!(gpiohandle_set_line_values_ioctl, 0xB4, 0x09, gpiohandle_data);
+        pub(crate) fn $name(fd: libc::c_int, data: &mut $ty) -> crate::errors::Result<libc::c_int> {
+            unsafe {
+                $name::$name(fd, data).map_err(|e| crate::errors::ioctl_err($ioctl_error_type, e))
+            }
+        }
+    };
+}
+
+wrap_ioctl!(
+    ioctl_read!(gpio_get_chipinfo_ioctl, 0xB4, 0x01, gpiochip_info),
+    IoctlKind::ChipInfo
+);
+wrap_ioctl!(
+    ioctl_readwrite!(gpio_get_lineinfo_ioctl, 0xB4, 0x02, gpioline_info),
+    IoctlKind::LineInfo
+);
+wrap_ioctl!(
+    ioctl_readwrite!(gpio_get_linehandle_ioctl, 0xB4, 0x03, gpiohandle_request),
+    IoctlKind::LineHandle
+);
+wrap_ioctl!(
+    ioctl_readwrite!(gpio_get_lineevent_ioctl, 0xB4, 0x04, gpioevent_request),
+    IoctlKind::LineEvent
+);
+
+wrap_ioctl!(
+    ioctl_readwrite!(
+        gpiohandle_get_line_values_ioctl,
+        0xB4,
+        0x08,
+        gpiohandle_data
+    ),
+    IoctlKind::GetLine
+);
+wrap_ioctl!(
+    ioctl_readwrite!(
+        gpiohandle_set_line_values_ioctl,
+        0xB4,
+        0x09,
+        gpiohandle_data
+    ),
+    IoctlKind::SetLine
+);
