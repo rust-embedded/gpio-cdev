@@ -69,6 +69,9 @@
 //! # fn main() -> Result<()> {
 //! // Read the state of GPIO4 on a raspberry pi.  /dev/gpiochip0
 //! // maps to the driver for the SoC (builtin) GPIO controller.
+//! // The LineHandle returned by request must be assigned to a
+//! // variable (in this case the variable handle) to ensure that
+//! // the corresponding file descriptor is not closed.
 //! let mut chip = Chip::new("/dev/gpiochip0")?;
 //! let handle = chip
 //!     .get_line(4)?
