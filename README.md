@@ -139,7 +139,9 @@ Using the sysfs API, one would write the global GPIO number to the "export" file
 to perform further operations using new files on the filesystem.  Using the
 gpiochip character device, a handle for performing operations on one or more
 GPIO offsets within a chip are available via a "linehandle" fd created using the
-`GPIO_GET_LINEHANDLE_IOCTL`.
+`GPIO_GET_LINEHANDLE_IOCTL`. A consequence of this is that a line will remember
+its state only for as long as the fd is open; the line's state will be reset
+once the fd is closed.
 
 When a linehandle is requested, additional information is also included about
 how the individual GPIOs will be used (input, output, as-is, active-low, open

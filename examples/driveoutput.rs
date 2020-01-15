@@ -27,7 +27,12 @@ fn do_main(args: Cli) -> std::result::Result<(), errors::Error> {
     let mut chip = Chip::new(args.chip)?;
 
     // NOTE: we set the default value to the desired state so
-    // setting it separately is not required
+    // setting it separately is not required. The LineHandle
+    // instance that is returned by request must be owned by a
+    // variable for the duration of the time that the line will
+    // be used. If the instance is not assigned to a variable,
+    // then the LineHandle will be immediately dropped after
+    // request returns and the pin will appear to do nothing.
     let _handle =
         chip.get_line(args.line)?
             .request(LineRequestFlags::OUTPUT, args.value, "driveoutput")?;
