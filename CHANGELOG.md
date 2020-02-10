@@ -8,6 +8,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## v0.3.0 - 2020-02-10
+
+Refactored Errors:
+- Removed the `error-chain` dependency.
+- Errors are now implemented "manually" with `ErrorKind` and `IoctlKind` enums. 
+- The encompassing `Error` type implements the `std::error::Error` trait.
+
 ## v0.2.0 - 2018-12-12
 
 Adds the ability to create a collection of lines from a single chip and read or write those lines simultaneously with a single stystem call.
