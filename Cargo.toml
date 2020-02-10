@@ -1,6 +1,6 @@
 [package]
 name = "gpio-cdev"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Paul Osborne <osbpau@gmail.com>", "Frank Pagliughi <fpagliughi@mindspring.com>"]
 description = "Linux GPIO Character Device Support (/dev/gpiochipN)"
 homepage = "https://github.com/posborne/rust-gpio-cdev"
