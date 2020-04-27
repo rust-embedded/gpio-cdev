@@ -8,7 +8,7 @@
 
 rust-gpio-cdev is a Rust library/crate providing access to [GPIO character device
 ABI](https://www.kernel.org/doc/Documentation/ABI/testing/gpio-cdev).  This API,
-stabilized with Linux v4.4, deprecates the legacy sysfs interface to GPIOs that is 
+stabilized with Linux v4.4, deprecates the legacy sysfs interface to GPIOs that is
 planned to be removed from the upstream kernel after
 year 2020 (which is coming up quickly).
 
@@ -172,6 +172,11 @@ using the queueing with timing information captured in the kernel.  Previously, 
 would need to quickly handle the event notification, make another system call
 to the value file to see the state, etc. which had far too many variables involved
 to be considered reliable.
+
+## Minimum Supported Rust Version (MSRV)
+
+This crate is guaranteed to compile on stable Rust 1.34.0 and up. It *might*
+compile with older versions but that may change in any new patch release.
 
 ## License
 
