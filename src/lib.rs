@@ -193,7 +193,7 @@ impl Chip {
     /// Open the GPIO Chip at the provided path (e.g. `/dev/gpiochip<N>`)
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Chip> {
         let f = File::open(path.as_ref())?;
-        let mut info: ffi::gpiochip_info = unsafe { mem::uninitialized() };
+        let mut info: ffi::gpiochip_info = unsafe { mem::MaybeUninit::uninit().assume_init() };
         ffi::gpio_get_chipinfo_ioctl(f.as_raw_fd(), &mut info)?;
 
         Ok(Chip {
@@ -328,12 +328,12 @@ pub struct LineInfo {
     consumer: Option<String>,
 }
 
-/// Line Request Flags
-///
-/// Maps to kernel [`GPIOHANDLE_REQUEST_*`] flags.
-///
-/// [`GPIOHANDLE_REQUEST_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L58
 bitflags! {
+    /// Line Request Flags
+    ///
+    /// Maps to kernel [`GPIOHANDLE_REQUEST_*`] flags.
+    ///
+    /// [`GPIOHANDLE_REQUEST_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L58
     pub struct LineRequestFlags: u32 {
         const INPUT = (1 << 0);
         const OUTPUT = (1 << 1);
@@ -343,12 +343,12 @@ bitflags! {
     }
 }
 
-/// Event request flags
-///
-/// Maps to kernel [`GPIOEVENT_REQEST_*`] flags.
-///
-/// [`GPIOEVENT_REQUEST_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L109
 bitflags! {
+    /// Event request flags
+    ///
+    /// Maps to kernel [`GPIOEVENT_REQEST_*`] flags.
+    ///
+    /// [`GPIOEVENT_REQUEST_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L109
     pub struct EventRequestFlags: u32 {
         const RISING_EDGE = (1 << 0);
         const FALLING_EDGE = (1 << 1);
@@ -356,12 +356,12 @@ bitflags! {
     }
 }
 
-/// Informational Flags
-///
-/// Maps to kernel [`GPIOLINE_FLAG_*`] flags.
-///
-/// [`GPIOLINE_FLAG_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L29
 bitflags! {
+    /// Informational Flags
+    ///
+    /// Maps to kernel [`GPIOLINE_FLAG_*`] flags.
+    ///
+    /// [`GPIOLINE_FLAG_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L29
     pub struct LineFlags: u32 {
         const KERNEL = (1 << 0);
         const IS_OUT = (1 << 1);
