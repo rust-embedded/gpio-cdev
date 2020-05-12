@@ -89,6 +89,12 @@ extern crate bitflags;
 extern crate libc;
 #[macro_use]
 extern crate nix;
+#[cfg(feature = "async-tokio")]
+extern crate futures;
+#[cfg(feature = "async-tokio")]
+extern crate mio;
+#[cfg(feature = "async-tokio")]
+extern crate tokio;
 
 use std::cmp::min;
 use std::ffi::CStr;
@@ -101,9 +107,13 @@ use std::ptr;
 use std::slice;
 use std::sync::Arc;
 
+#[cfg(feature = "async-tokio")]
+mod async_tokio;
 pub mod errors;
 mod ffi;
 
+#[cfg(feature = "async-tokio")]
+pub use crate::async_tokio::AsyncLineEventHandle;
 use errors::*;
 
 unsafe fn rstr_lcpy(dst: *mut libc::c_char, src: &str, length: usize) {
@@ -549,6 +559,17 @@ impl Line {
             event_flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
+    }
+
+    #[cfg(feature = "async-tokio")]
+    pub fn async_events(
+        &self,
+        handle_flags: LineRequestFlags,
+        event_flags: EventRequestFlags,
+        consumer: &str,
+    ) -> Result<AsyncLineEventHandle> {
+        let events = self.events(handle_flags, event_flags, consumer)?;
+        Ok(AsyncLineEventHandle::new(events)?)
     }
 }
 

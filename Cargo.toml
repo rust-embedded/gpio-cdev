@@ -9,11 +9,23 @@ readme = "README.md"
 categories = ["embedded", "hardware-support", "os", "os::unix-apis"]
 keywords = ["linux", "gpio", "gpiochip", "embedded"]
 license = "MIT OR Apache-2.0"
+edition = "2018"
+
+[features]
+default = []
+async-tokio = ["tokio", "futures", "mio"]
+
+[[example]]
+name = "async_tokio"
+required-features = ["async-tokio"]
 
 [dependencies]
 bitflags = "1.0"
 libc = "0.2"
 nix = "0.14"
+tokio = { version = "0.2", features = ["io-driver", "rt-threaded", "macros"], optional = true }
+futures = { version = "0.3", optional = true }
+mio = { version = "0.6", optional = true }
 
 [dev-dependencies]
 quicli = "0.2"
