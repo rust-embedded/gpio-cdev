@@ -950,21 +950,10 @@ impl LineEventHandle {
     /// kernel for the line which matches the subscription criteria
     /// specified in the `event_flags` when the handle was created.
     pub fn get_event(&self) -> Result<LineEvent> {
-        let mut data: ffi::gpioevent_data = unsafe { mem::zeroed() };
-        let mut data_as_buf = unsafe {
-            slice::from_raw_parts_mut(
-                &mut data as *mut ffi::gpioevent_data as *mut u8,
-                mem::size_of::<ffi::gpioevent_data>(),
-            )
-        };
-        let bytes_read =
-            nix::unistd::read(self.file.as_raw_fd(), &mut data_as_buf).map_err(event_err)?;
-
-        if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
-            let e = nix::Error::Sys(nix::errno::Errno::EIO);
-            Err(event_err(e))
-        } else {
-            Ok(LineEvent(data))
+        match self.read_event() {
+            Ok(Some(event)) => Ok(event),
+            Ok(None) => Err(event_err(nix::Error::Sys(nix::errno::Errno::EIO))),
+            Err(e) => Err(event_err(e)),
         }
     }
 
@@ -984,6 +973,28 @@ impl LineEventHandle {
     pub fn line(&self) -> &Line {
         &self.line
     }
+
+    /// Helper function which returns the line event if a complete event was read, Ok(None) if not
+    /// enough data was read or the error returned by `read()`.
+    ///
+    /// This function allows access to the raw `nix::Error` as required, for example, to theck
+    /// whether read() returned -EAGAIN.
+    pub(crate) fn read_event(&self) -> std::result::Result<Option<LineEvent>, nix::Error> {
+        let mut data: ffi::gpioevent_data = unsafe { mem::zeroed() };
+        let mut data_as_buf = unsafe {
+            slice::from_raw_parts_mut(
+                &mut data as *mut ffi::gpioevent_data as *mut u8,
+                mem::size_of::<ffi::gpioevent_data>(),
+            )
+        };
+        let bytes_read = nix::unistd::read(self.file.as_raw_fd(), &mut data_as_buf)?;
+
+        if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
+            Ok(None)
+        } else {
+            Ok(Some(LineEvent(data)))
+        }
+    }
 }
 
 impl AsRawFd for LineEventHandle {
@@ -997,21 +1008,9 @@ impl Iterator for LineEventHandle {
     type Item = Result<LineEvent>;
 
     fn next(&mut self) -> Option<Result<LineEvent>> {
-        let mut data: ffi::gpioevent_data = unsafe { mem::zeroed() };
-        let mut data_as_buf = unsafe {
-            slice::from_raw_parts_mut(
-                &mut data as *mut ffi::gpioevent_data as *mut u8,
-                mem::size_of::<ffi::gpioevent_data>(),
-            )
-        };
-        match nix::unistd::read(self.file.as_raw_fd(), &mut data_as_buf) {
-            Ok(bytes_read) => {
-                if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
-                    None
-                } else {
-                    Some(Ok(LineEvent(data)))
-                }
-            }
+        match self.read_event() {
+            Ok(None) => None,
+            Ok(Some(event)) => Some(Ok(event)),
             Err(e) => Some(Err(event_err(e))),
         }
     }

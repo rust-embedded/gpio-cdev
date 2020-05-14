@@ -17,13 +17,11 @@ use mio::{PollOpt, Ready, Token};
 use tokio::io::PollEvented;
 
 use std::io;
-use std::mem;
 use std::os::unix::io::AsRawFd;
 use std::pin::Pin;
-use std::slice;
 
 use super::errors::event_err;
-use super::{ffi, LineEvent, LineEventHandle, Result};
+use super::{LineEvent, LineEventHandle, Result};
 
 struct PollWrapper {
     handle: LineEventHandle,
@@ -123,26 +121,11 @@ impl Stream for AsyncLineEventHandle {
             return Poll::Ready(Some(Err(e.into())));
         }
 
-        // TODO: This code should not be duplicated here.
-        let mut data: ffi::gpioevent_data = unsafe { mem::zeroed() };
-        let mut data_as_buf = unsafe {
-            slice::from_raw_parts_mut(
-                &mut data as *mut ffi::gpioevent_data as *mut u8,
-                mem::size_of::<ffi::gpioevent_data>(),
-            )
-        };
-        match nix::unistd::read(
-            self.evented.get_ref().handle.file.as_raw_fd(),
-            &mut data_as_buf,
-        ) {
-            Ok(bytes_read) => {
-                if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
-                    let e = nix::Error::Sys(nix::errno::Errno::EIO);
-                    Poll::Ready(Some(Err(event_err(e))))
-                } else {
-                    Poll::Ready(Some(Ok(LineEvent(data))))
-                }
-            }
+        match self.evented.get_ref().handle.read_event() {
+            Ok(Some(event)) => Poll::Ready(Some(Ok(event))),
+            Ok(None) => Poll::Ready(Some(Err(event_err(nix::Error::Sys(
+                nix::errno::Errno::EIO,
+            ))))),
             Err(nix::Error::Sys(nix::errno::Errno::EAGAIN)) => {
                 self.evented.clear_read_ready(cx, ready)?;
                 Poll::Pending
