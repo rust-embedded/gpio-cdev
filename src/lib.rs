@@ -89,6 +89,12 @@ extern crate bitflags;
 extern crate libc;
 #[macro_use]
 extern crate nix;
+#[cfg(feature = "async-tokio")]
+extern crate futures;
+#[cfg(feature = "async-tokio")]
+extern crate mio;
+#[cfg(feature = "async-tokio")]
+extern crate tokio;
 
 use std::cmp::min;
 use std::ffi::CStr;
@@ -101,9 +107,13 @@ use std::ptr;
 use std::slice;
 use std::sync::Arc;
 
+#[cfg(feature = "async-tokio")]
+mod async_tokio;
 pub mod errors;
 mod ffi;
 
+#[cfg(feature = "async-tokio")]
+pub use crate::async_tokio::AsyncLineEventHandle;
 use errors::*;
 
 unsafe fn rstr_lcpy(dst: *mut libc::c_char, src: &str, length: usize) {
@@ -193,7 +203,7 @@ impl Chip {
     /// Open the GPIO Chip at the provided path (e.g. `/dev/gpiochip<N>`)
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Chip> {
         let f = File::open(path.as_ref())?;
-        let mut info: ffi::gpiochip_info = unsafe { mem::uninitialized() };
+        let mut info: ffi::gpiochip_info = unsafe { mem::MaybeUninit::uninit().assume_init() };
         ffi::gpio_get_chipinfo_ioctl(f.as_raw_fd(), &mut info)?;
 
         Ok(Chip {
@@ -328,12 +338,12 @@ pub struct LineInfo {
     consumer: Option<String>,
 }
 
-/// Line Request Flags
-///
-/// Maps to kernel [`GPIOHANDLE_REQUEST_*`] flags.
-///
-/// [`GPIOHANDLE_REQUEST_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L58
 bitflags! {
+    /// Line Request Flags
+    ///
+    /// Maps to kernel [`GPIOHANDLE_REQUEST_*`] flags.
+    ///
+    /// [`GPIOHANDLE_REQUEST_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L58
     pub struct LineRequestFlags: u32 {
         const INPUT = (1 << 0);
         const OUTPUT = (1 << 1);
@@ -343,12 +353,12 @@ bitflags! {
     }
 }
 
-/// Event request flags
-///
-/// Maps to kernel [`GPIOEVENT_REQEST_*`] flags.
-///
-/// [`GPIOEVENT_REQUEST_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L109
 bitflags! {
+    /// Event request flags
+    ///
+    /// Maps to kernel [`GPIOEVENT_REQEST_*`] flags.
+    ///
+    /// [`GPIOEVENT_REQUEST_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L109
     pub struct EventRequestFlags: u32 {
         const RISING_EDGE = (1 << 0);
         const FALLING_EDGE = (1 << 1);
@@ -356,12 +366,12 @@ bitflags! {
     }
 }
 
-/// Informational Flags
-///
-/// Maps to kernel [`GPIOLINE_FLAG_*`] flags.
-///
-/// [`GPIOLINE_FLAG_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L29
 bitflags! {
+    /// Informational Flags
+    ///
+    /// Maps to kernel [`GPIOLINE_FLAG_*`] flags.
+    ///
+    /// [`GPIOLINE_FLAG_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L29
     pub struct LineFlags: u32 {
         const KERNEL = (1 << 0);
         const IS_OUT = (1 << 1);
@@ -549,6 +559,17 @@ impl Line {
             event_flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
+    }
+
+    #[cfg(feature = "async-tokio")]
+    pub fn async_events(
+        &self,
+        handle_flags: LineRequestFlags,
+        event_flags: EventRequestFlags,
+        consumer: &str,
+    ) -> Result<AsyncLineEventHandle> {
+        let events = self.events(handle_flags, event_flags, consumer)?;
+        Ok(AsyncLineEventHandle::new(events)?)
     }
 }
 
@@ -929,21 +950,10 @@ impl LineEventHandle {
     /// kernel for the line which matches the subscription criteria
     /// specified in the `event_flags` when the handle was created.
     pub fn get_event(&self) -> Result<LineEvent> {
-        let mut data: ffi::gpioevent_data = unsafe { mem::zeroed() };
-        let mut data_as_buf = unsafe {
-            slice::from_raw_parts_mut(
-                &mut data as *mut ffi::gpioevent_data as *mut u8,
-                mem::size_of::<ffi::gpioevent_data>(),
-            )
-        };
-        let bytes_read =
-            nix::unistd::read(self.file.as_raw_fd(), &mut data_as_buf).map_err(event_err)?;
-
-        if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
-            let e = nix::Error::Sys(nix::errno::Errno::EIO);
-            Err(event_err(e))
-        } else {
-            Ok(LineEvent(data))
+        match self.read_event() {
+            Ok(Some(event)) => Ok(event),
+            Ok(None) => Err(event_err(nix::Error::Sys(nix::errno::Errno::EIO))),
+            Err(e) => Err(event_err(e)),
         }
     }
 
@@ -963,6 +973,28 @@ impl LineEventHandle {
     pub fn line(&self) -> &Line {
         &self.line
     }
+
+    /// Helper function which returns the line event if a complete event was read, Ok(None) if not
+    /// enough data was read or the error returned by `read()`.
+    ///
+    /// This function allows access to the raw `nix::Error` as required, for example, to theck
+    /// whether read() returned -EAGAIN.
+    pub(crate) fn read_event(&self) -> std::result::Result<Option<LineEvent>, nix::Error> {
+        let mut data: ffi::gpioevent_data = unsafe { mem::zeroed() };
+        let mut data_as_buf = unsafe {
+            slice::from_raw_parts_mut(
+                &mut data as *mut ffi::gpioevent_data as *mut u8,
+                mem::size_of::<ffi::gpioevent_data>(),
+            )
+        };
+        let bytes_read = nix::unistd::read(self.file.as_raw_fd(), &mut data_as_buf)?;
+
+        if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
+            Ok(None)
+        } else {
+            Ok(Some(LineEvent(data)))
+        }
+    }
 }
 
 impl AsRawFd for LineEventHandle {
@@ -976,21 +1008,9 @@ impl Iterator for LineEventHandle {
     type Item = Result<LineEvent>;
 
     fn next(&mut self) -> Option<Result<LineEvent>> {
-        let mut data: ffi::gpioevent_data = unsafe { mem::zeroed() };
-        let mut data_as_buf = unsafe {
-            slice::from_raw_parts_mut(
-                &mut data as *mut ffi::gpioevent_data as *mut u8,
-                mem::size_of::<ffi::gpioevent_data>(),
-            )
-        };
-        match nix::unistd::read(self.file.as_raw_fd(), &mut data_as_buf) {
-            Ok(bytes_read) => {
-                if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
-                    None
-                } else {
-                    Some(Ok(LineEvent(data)))
-                }
-            }
+        match self.read_event() {
+            Ok(None) => None,
+            Ok(Some(event)) => Some(Ok(event)),
             Err(e) => Some(Err(event_err(e))),
         }
     }
