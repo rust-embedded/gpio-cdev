@@ -6,11 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-extern crate gpio_cdev;
-#[macro_use]
-extern crate quicli;
-
-use gpio_cdev::*;
+use gpio_cdev::{Chip, LineRequestFlags};
 use quicli::prelude::*;
 
 #[derive(Debug, StructOpt)]
@@ -21,7 +17,7 @@ struct Cli {
     line: u32,
 }
 
-fn do_main(args: Cli) -> std::result::Result<(), errors::Error> {
+fn do_main(args: Cli) -> std::result::Result<(), gpio_cdev::Error> {
     let mut chip = Chip::new(args.chip)?;
     let handle = chip
         .get_line(args.line)?
@@ -31,7 +27,7 @@ fn do_main(args: Cli) -> std::result::Result<(), errors::Error> {
     Ok(())
 }
 
-main!(|args: Cli| match do_main(args) {
+quicli::main!(|args: Cli| match do_main(args) {
     Ok(()) => {}
     Err(e) => {
         println!("Error: {:?}", e);

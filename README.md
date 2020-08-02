@@ -63,7 +63,7 @@ use gpio_cdev::{Chip, LineRequestFlags, EventRequestFlags, EventType};
 // on gpiochip0 and mirror its state on another line.  With this you
 // could, for instance, control the state of an LED with a button
 // if hooked up to the right pins on a raspberry pi.
-fn mirror_gpio(inputline: u32, outputline: u32) -> gpio_cdev::errors::Result<()> {
+fn mirror_gpio(inputline: u32, outputline: u32) -> Result<(), gpio_cdev::Error> {
     let mut chip = Chip::new("/dev/gpiochip0")?;
     let input = chip.get_line(inputline)?;
     let output = chip.get_line(outputline)?;
@@ -96,9 +96,8 @@ Note that this requires the addition of the `async-tokio` feature.
 ```rust
 use futures::stream::StreamExt;
 use gpio_cdev::{Chip, AsyncLineEventHandle};
-use gpio_cdev::errors::Error;
 
-async fn gpiomon(chip: String, line: u32) -> Result<(), Error> {
+async fn gpiomon(chip: String, line: u32) -> gpio_cdev::Result<()> {
     let mut chip = Chip::new(args.chip)?;
     let line = chip.get_line(args.line)?;
     let mut events = AsyncLineEventHandle::new(line.events(

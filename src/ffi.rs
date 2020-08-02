@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::errors::IoctlKind;
+use crate::IoctlKind;
 use libc;
 
 pub const GPIOHANDLES_MAX: usize = 64;

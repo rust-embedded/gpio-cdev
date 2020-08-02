@@ -10,6 +10,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## v0.4.0 - 2020-08-01
 
+- Removed pub "errors" module.  Error now exposed at top level.
 - MSRV is now 1.39.0
 - Add support behind a feature flag for reading events from a line as a Stream via tokio. [#35](https://github.com/rust-embedded/gpio-cdev/pull/35).
 

@@ -20,7 +20,7 @@ use std::io;
 use std::os::unix::io::AsRawFd;
 use std::pin::Pin;
 
-use super::errors::event_err;
+use super::event_err;
 use super::{LineEvent, LineEventHandle, Result};
 
 struct PollWrapper {
@@ -60,11 +60,10 @@ impl Evented for PollWrapper {
 /// The following example waits for state changes on an input line.
 ///
 /// ```no_run
-/// # type Result<T> = std::result::Result<T, gpio_cdev::errors::Error>;
 /// use futures::stream::StreamExt;
 /// use gpio_cdev::{AsyncLineEventHandle, Chip, EventRequestFlags, LineRequestFlags};
 ///
-/// async fn print_events(line: u32) -> Result<()> {
+/// async fn print_events(line: u32) -> Result<(), gpio_cdev::Error> {
 ///     let mut chip = Chip::new("/dev/gpiochip0")?;
 ///     let line = chip.get_line(line)?;
 ///     let mut events = AsyncLineEventHandle::new(line.events(

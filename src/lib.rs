@@ -26,11 +26,10 @@
 //! state to another line/pin.
 //!
 //! ```no_run
-//! # type Result<T> = std::result::Result<T, gpio_cdev::errors::Error>;
 //! use gpio_cdev::{Chip, LineRequestFlags, EventRequestFlags, EventType};
 //!
 //! // Lines are offset within gpiochip0; see docs for more info on chips/lines
-//! fn mirror_gpio(inputline: u32, outputline: u32) -> Result<()> {
+//! fn mirror_gpio(inputline: u32, outputline: u32) -> Result<(), gpio_cdev::Error> {
 //!     let mut chip = Chip::new("/dev/gpiochip0")?;
 //!     let input = chip.get_line(inputline)?;
 //!     let output = chip.get_line(outputline)?;
@@ -55,7 +54,7 @@
 //!     Ok(())
 //! }
 //!
-//! # fn main() -> Result<()> {
+//! # fn main() -> Result<(), gpio_cdev::Error> {
 //! #     mirror_gpio(0, 1)
 //! # }
 //! ```
@@ -63,10 +62,9 @@
 //! To get the state of a GPIO Line on a given chip:
 //!
 //! ```no_run
-//! # type Result<T> = std::result::Result<T, gpio_cdev::errors::Error>;
 //! use gpio_cdev::{Chip, LineRequestFlags};
 //!
-//! # fn main() -> Result<()> {
+//! # fn main() -> Result<(), gpio_cdev::Error> {
 //! // Read the state of GPIO4 on a raspberry pi.  /dev/gpiochip0
 //! // maps to the driver for the SoC (builtin) GPIO controller.
 //! // The LineHandle returned by request must be assigned to a
@@ -82,19 +80,12 @@
 //! # Ok(()) }
 //! ```
 //!
-//! [README on Github]: https://github.com/posborne/rust-gpio-cdev
+//! [README on Github]: https://github.com/rust-embedded/rust-gpio-cdev
 
 #[macro_use]
 extern crate bitflags;
-extern crate libc;
 #[macro_use]
 extern crate nix;
-#[cfg(feature = "async-tokio")]
-extern crate futures;
-#[cfg(feature = "async-tokio")]
-extern crate mio;
-#[cfg(feature = "async-tokio")]
-extern crate tokio;
 
 use std::cmp::min;
 use std::ffi::CStr;
@@ -109,12 +100,22 @@ use std::sync::Arc;
 
 #[cfg(feature = "async-tokio")]
 mod async_tokio;
-pub mod errors;
+pub mod errors; // pub portion is deprecated
 mod ffi;
+
+#[derive(Debug)]
+pub enum IoctlKind {
+    ChipInfo,
+    LineInfo,
+    LineHandle,
+    LineEvent,
+    GetLine,
+    SetLine,
+}
 
 #[cfg(feature = "async-tokio")]
 pub use crate::async_tokio::AsyncLineEventHandle;
-use errors::*;
+pub use errors::*;
 
 unsafe fn rstr_lcpy(dst: *mut libc::c_char, src: &str, length: usize) {
     let copylen = min(src.len() + 1, length);
@@ -511,11 +512,10 @@ impl Line {
     /// # Example
     ///
     /// ```no_run
-    /// use gpio_cdev::*;
+    /// # fn main() -> Result<(), gpio_cdev::Error> {
+    /// use gpio_cdev::{Chip, LineRequestFlags, EventRequestFlags};
+    /// use std::io;
     ///
-    /// # use std::io;
-    /// # type Result<T> = std::result::Result<T, errors::Error>;
-    /// # fn main() -> Result<()> {
     /// let mut chip = Chip::new("/dev/gpiochip0")?;
     /// let input = chip.get_line(0)?;
     ///

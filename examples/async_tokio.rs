@@ -7,7 +7,7 @@
 // except according to those terms.
 
 use futures::stream::StreamExt;
-use gpio_cdev::*;
+use gpio_cdev::{AsyncLineEventHandle, Chip, EventRequestFlags, LineRequestFlags};
 use quicli::prelude::*;
 
 #[derive(Debug, StructOpt)]
@@ -18,7 +18,7 @@ struct Cli {
     line: u32,
 }
 
-async fn do_main(args: Cli) -> std::result::Result<(), errors::Error> {
+async fn do_main(args: Cli) -> std::result::Result<(), gpio_cdev::Error> {
     let mut chip = Chip::new(args.chip)?;
     let line = chip.get_line(args.line)?;
     let mut events = AsyncLineEventHandle::new(line.events(

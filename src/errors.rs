@@ -1,3 +1,8 @@
+//! This module is deprecated and types are exported from the top-level of the crate
+//!
+//! In futures versions of the crate, this module will no longer be included in the crate.
+
+use crate::IoctlKind;
 use std::error::Error as StdError;
 use std::fmt;
 use std::io::Error as IOError;
@@ -7,16 +12,6 @@ pub(crate) type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
-}
-
-#[derive(Debug)]
-pub enum IoctlKind {
-    ChipInfo,
-    LineInfo,
-    LineHandle,
-    LineEvent,
-    GetLine,
-    SetLine,
 }
 
 #[derive(Debug)]
