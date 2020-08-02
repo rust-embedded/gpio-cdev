@@ -23,8 +23,13 @@ Add the following to your Cargo.toml
 
 ```
 [dependencies]
-gpio-cdev = "0.2"
+gpio-cdev = "0.4"
 ```
+
+Note that the following features are available:
+
+* `async-tokio`: Adds a Stream interface for consuming GPIO events in async code
+  within a tokio runtime.
 
 ## Examples
 
@@ -78,6 +83,33 @@ fn mirror_gpio(inputline: u32, outputline: u32) -> gpio_cdev::errors::Result<()>
                 output_handle.set_value(0)?;
             }
         }
+    }
+
+    Ok(())
+}
+```
+
+### Async Usage
+
+Note that this requires the addition of the `async-tokio` feature.
+
+```rust
+use futures::stream::StreamExt;
+use gpio_cdev::{Chip, AsyncLineEventHandle};
+use gpio_cdev::errors::Error;
+
+async fn gpiomon(chip: String, line: u32) -> Result<(), Error> {
+    let mut chip = Chip::new(args.chip)?;
+    let line = chip.get_line(args.line)?;
+    let mut events = AsyncLineEventHandle::new(line.events(
+        LineRequestFlags::INPUT,
+        EventRequestFlags::BOTH_EDGES,
+        "gpioevents",
+    )?)?;
+
+    while let Some(event) = events.next().await {
+        let event = event?;
+        println!("GPIO Event: {:?}", event);
     }
 
     Ok(())
