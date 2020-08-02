@@ -3,15 +3,15 @@
 set -ex
 
 main() {
-    cross build --target $TARGET
-    cross build --target $TARGET --release
+    cross build --target $TARGET --all-features
+    cross build --target $TARGET --release --all-features
 
     if [ ! -z $DISABLE_TESTS ]; then
         return
     fi
 
-    cross test --target $TARGET
-    cross test --target $TARGET --release
+    cross test --target $TARGET --all-features
+    cross test --target $TARGET --release --all-features
 
     # No main binary, so skip the 'cross run' portion
     # cross run --target $TARGET
