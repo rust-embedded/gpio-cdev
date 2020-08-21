@@ -7,7 +7,7 @@ homepage = "https://github.com/posborne/rust-gpio-cdev"
 repository = "https://github.com/posborne/rust-gpio-cdev"
 readme = "README.md"
 categories = ["embedded", "hardware-support", "os", "os::unix-apis"]
-keywords = ["linux", "gpio", "gpiochip", "embedded"]
+keywords = ["linux", "gpio", "gpiochip", "embedded", "libgpio", "libgpiod", "gpiod"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
 
