@@ -23,8 +23,13 @@ Add the following to your Cargo.toml
 
 ```
 [dependencies]
-gpio-cdev = "0.2"
+gpio-cdev = "0.4"
 ```
+
+Note that the following features are available:
+
+* `async-tokio`: Adds a Stream interface for consuming GPIO events in async code
+  within a tokio runtime.
 
 ## Examples
 
@@ -58,7 +63,7 @@ use gpio_cdev::{Chip, LineRequestFlags, EventRequestFlags, EventType};
 // on gpiochip0 and mirror its state on another line.  With this you
 // could, for instance, control the state of an LED with a button
 // if hooked up to the right pins on a raspberry pi.
-fn mirror_gpio(inputline: u32, outputline: u32) -> gpio_cdev::errors::Result<()> {
+fn mirror_gpio(inputline: u32, outputline: u32) -> Result<(), gpio_cdev::Error> {
     let mut chip = Chip::new("/dev/gpiochip0")?;
     let input = chip.get_line(inputline)?;
     let output = chip.get_line(outputline)?;
@@ -78,6 +83,32 @@ fn mirror_gpio(inputline: u32, outputline: u32) -> gpio_cdev::errors::Result<()>
                 output_handle.set_value(0)?;
             }
         }
+    }
+
+    Ok(())
+}
+```
+
+### Async Usage
+
+Note that this requires the addition of the `async-tokio` feature.
+
+```rust
+use futures::stream::StreamExt;
+use gpio_cdev::{Chip, AsyncLineEventHandle};
+
+async fn gpiomon(chip: String, line: u32) -> gpio_cdev::Result<()> {
+    let mut chip = Chip::new(args.chip)?;
+    let line = chip.get_line(args.line)?;
+    let mut events = AsyncLineEventHandle::new(line.events(
+        LineRequestFlags::INPUT,
+        EventRequestFlags::BOTH_EDGES,
+        "gpioevents",
+    )?)?;
+
+    while let Some(event) = events.next().await {
+        let event = event?;
+        println!("GPIO Event: {:?}", event);
     }
 
     Ok(())
@@ -175,7 +206,7 @@ to be considered reliable.
 
 ## Minimum Supported Rust Version (MSRV)
 
-This crate is guaranteed to compile on stable Rust 1.38.0 and up. It *might*
+This crate is guaranteed to compile on stable Rust 1.39.0 and up. It *might*
 compile with older versions but that may change in any new patch release.
 
 ## License

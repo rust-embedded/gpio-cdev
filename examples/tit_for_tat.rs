@@ -6,15 +6,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-extern crate gpio_cdev;
-#[macro_use]
-extern crate quicli;
-
-use gpio_cdev::*;
+use gpio_cdev::{Chip, EventRequestFlags, EventType, LineRequestFlags};
 use quicli::prelude::*;
 use std::thread::sleep;
 use std::time::Duration;
-
 
 #[derive(Debug, StructOpt)]
 struct Cli {
@@ -28,7 +23,7 @@ struct Cli {
     sleeptime: u64,
 }
 
-fn do_main(args: Cli) -> std::result::Result<(), errors::Error> {
+fn do_main(args: Cli) -> std::result::Result<(), gpio_cdev::Error> {
     let mut chip = Chip::new(args.chip)?;
     let input = chip.get_line(args.inputline)?;
     let output = chip.get_line(args.outputline)?;
@@ -59,7 +54,7 @@ fn do_main(args: Cli) -> std::result::Result<(), errors::Error> {
     Ok(())
 }
 
-main!(|args: Cli| match do_main(args) {
+quicli::main!(|args: Cli| match do_main(args) {
     Ok(()) => {}
     Err(e) => {
         println!("Error: {:?}", e);
