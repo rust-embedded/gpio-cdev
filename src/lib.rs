@@ -82,6 +82,8 @@
 //!
 //! [README on Github]: https://github.com/rust-embedded/rust-gpio-cdev
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 #[macro_use]
 extern crate bitflags;
 #[macro_use]
@@ -99,6 +101,7 @@ use std::slice;
 use std::sync::Arc;
 
 #[cfg(feature = "async-tokio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async-tokio")))]
 mod async_tokio;
 pub mod errors; // pub portion is deprecated
 mod ffi;
@@ -114,6 +117,7 @@ pub enum IoctlKind {
 }
 
 #[cfg(feature = "async-tokio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async-tokio")))]
 pub use crate::async_tokio::AsyncLineEventHandle;
 pub use errors::*;
 
@@ -562,6 +566,7 @@ impl Line {
     }
 
     #[cfg(feature = "async-tokio")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "async-tokio")))]
     pub fn async_events(
         &self,
         handle_flags: LineRequestFlags,

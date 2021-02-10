@@ -30,3 +30,9 @@ mio = { version = "0.6", optional = true }
 [dev-dependencies]
 quicli = "0.2"
 anyhow = "1.0"
+
+[package.metadata.docs.rs]
+# To build locally:
+# RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
