@@ -11,47 +11,13 @@
 use futures::ready;
 use futures::stream::Stream;
 use futures::task::{Context, Poll};
-use mio::event::Evented;
-use mio::unix::EventedFd;
-use mio::{PollOpt, Ready, Token};
-use tokio::io::PollEvented;
+use tokio::io::unix::{AsyncFd, TryIoError};
 
-use std::io;
 use std::os::unix::io::AsRawFd;
 use std::pin::Pin;
 
 use super::event_err;
 use super::{LineEvent, LineEventHandle, Result};
-
-struct PollWrapper {
-    handle: LineEventHandle,
-}
-
-impl Evented for PollWrapper {
-    fn register(
-        &self,
-        poll: &mio::Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        EventedFd(&self.handle.file.as_raw_fd()).register(poll, token, interest, opts)
-    }
-
-    fn reregister(
-        &self,
-        poll: &mio::Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        EventedFd(&self.handle.file.as_raw_fd()).reregister(poll, token, interest, opts)
-    }
-
-    fn deregister(&self, poll: &mio::Poll) -> io::Result<()> {
-        EventedFd(&self.handle.file.as_raw_fd()).deregister(poll)
-    }
-}
 
 /// Wrapper around a `LineEventHandle` which implements a `futures::stream::Stream` for interrupts.
 ///
@@ -88,7 +54,7 @@ impl Evented for PollWrapper {
 /// # }
 /// ```
 pub struct AsyncLineEventHandle {
-    evented: PollEvented<PollWrapper>,
+    asyncfd: AsyncFd<LineEventHandle>,
 }
 
 impl AsyncLineEventHandle {
@@ -106,7 +72,7 @@ impl AsyncLineEventHandle {
         }
 
         Ok(AsyncLineEventHandle {
-            evented: PollEvented::new(PollWrapper { handle })?,
+            asyncfd: AsyncFd::new(handle)?,
         })
     }
 }
@@ -114,28 +80,27 @@ impl AsyncLineEventHandle {
 impl Stream for AsyncLineEventHandle {
     type Item = Result<LineEvent>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        let ready = Ready::readable();
-        if let Err(e) = ready!(self.evented.poll_read_ready(cx, ready)) {
-            return Poll::Ready(Some(Err(e.into())));
-        }
-
-        match self.evented.get_ref().handle.read_event() {
-            Ok(Some(event)) => Poll::Ready(Some(Ok(event))),
-            Ok(None) => Poll::Ready(Some(Err(event_err(nix::Error::Sys(
-                nix::errno::Errno::EIO,
-            ))))),
-            Err(nix::Error::Sys(nix::errno::Errno::EAGAIN)) => {
-                self.evented.clear_read_ready(cx, ready)?;
-                Poll::Pending
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+        loop {
+            let mut guard = ready!(self.asyncfd.poll_read_ready_mut(cx))?;
+            match guard.try_io(|inner| inner.get_mut().read_event()) {
+                Err(TryIoError { .. }) => {
+                    // Continue
+                }
+                Ok(Ok(Some(event))) => return Poll::Ready(Some(Ok(event))),
+                Ok(Ok(None)) => {
+                    return Poll::Ready(Some(Err(event_err(nix::Error::Sys(
+                        nix::errno::Errno::EIO,
+                    )))))
+                }
+                Ok(Err(err)) => return Poll::Ready(Some(Err(err.into()))),
             }
-            Err(e) => Poll::Ready(Some(Err(event_err(e)))),
         }
     }
 }
 
 impl AsRef<LineEventHandle> for AsyncLineEventHandle {
     fn as_ref(&self) -> &LineEventHandle {
-        &self.evented.get_ref().handle
+        &self.asyncfd.get_ref()
     }
 }

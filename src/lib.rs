@@ -92,6 +92,7 @@ extern crate nix;
 use std::cmp::min;
 use std::ffi::CStr;
 use std::fs::{read_dir, File, ReadDir};
+use std::io::Read;
 use std::mem;
 use std::ops::Index;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
@@ -954,11 +955,11 @@ impl LineEventHandle {
     /// This blocks while there is not another event available from the
     /// kernel for the line which matches the subscription criteria
     /// specified in the `event_flags` when the handle was created.
-    pub fn get_event(&self) -> Result<LineEvent> {
+    pub fn get_event(&mut self) -> Result<LineEvent> {
         match self.read_event() {
             Ok(Some(event)) => Ok(event),
             Ok(None) => Err(event_err(nix::Error::Sys(nix::errno::Errno::EIO))),
-            Err(e) => Err(event_err(e)),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -981,10 +982,7 @@ impl LineEventHandle {
 
     /// Helper function which returns the line event if a complete event was read, Ok(None) if not
     /// enough data was read or the error returned by `read()`.
-    ///
-    /// This function allows access to the raw `nix::Error` as required, for example, to theck
-    /// whether read() returned -EAGAIN.
-    pub(crate) fn read_event(&self) -> std::result::Result<Option<LineEvent>, nix::Error> {
+    pub(crate) fn read_event(&mut self) -> std::io::Result<Option<LineEvent>> {
         let mut data: ffi::gpioevent_data = unsafe { mem::zeroed() };
         let mut data_as_buf = unsafe {
             slice::from_raw_parts_mut(
@@ -992,8 +990,7 @@ impl LineEventHandle {
                 mem::size_of::<ffi::gpioevent_data>(),
             )
         };
-        let bytes_read = nix::unistd::read(self.file.as_raw_fd(), &mut data_as_buf)?;
-
+        let bytes_read = self.file.read(&mut data_as_buf)?;
         if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
             Ok(None)
         } else {
@@ -1016,7 +1013,7 @@ impl Iterator for LineEventHandle {
         match self.read_event() {
             Ok(None) => None,
             Ok(Some(event)) => Some(Ok(event)),
-            Err(e) => Some(Err(event_err(e))),
+            Err(e) => Some(Err(e.into())),
         }
     }
 }
