@@ -8,6 +8,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## v0.5.0
+
+- Update Tokio to 1.x. #[55]((https://github.com/rust-embedded/gpio-cdev/pull/55).
+- Breaking change of `LineEventHandle::get_event()` which now expects `&mut self`.
+- MSRV is now 1.45.0
+
+
 ## v0.4.0 - 2020-08-01
 
 - Removed pub "errors" module.  Error now exposed at top level.
