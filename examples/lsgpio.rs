@@ -53,7 +53,7 @@ fn main() {
                             flags.push("open-source");
                         }
 
-                        let usage = if flags.is_empty() {
+                        let usage = if !flags.is_empty() {
                             format!("[{}]", flags.join(" "))
                         } else {
                             "".to_owned()
