@@ -7,7 +7,6 @@
 // except according to those terms.
 
 use crate::IoctlKind;
-use libc;
 
 pub const GPIOHANDLES_MAX: usize = 64;
 
