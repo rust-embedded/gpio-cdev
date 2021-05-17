@@ -8,8 +8,6 @@
 
 //! Clone of functionality of linux/tools/gpio/lsgpio.c
 
-extern crate gpio_cdev;
-
 use gpio_cdev::*;
 
 fn main() {

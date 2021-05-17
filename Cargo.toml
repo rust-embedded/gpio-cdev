@@ -22,12 +22,13 @@ required-features = ["async-tokio"]
 [dependencies]
 bitflags = "1.0"
 libc = "0.2"
-nix = "0.14"
+nix = "0.20"
 tokio = { version = "1", features = ["io-std", "net"], optional = true }
 futures = { version = "0.3", optional = true }
 
 [dev-dependencies]
-quicli = "0.2"
+quicli = "0.4"
+structopt = "0.3"
 anyhow = "1.0"
 tokio = { version = "1", features = ["io-std", "rt-multi-thread", "macros", "net"] }
 

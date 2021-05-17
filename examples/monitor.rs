@@ -6,16 +6,11 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-extern crate gpio_cdev;
-extern crate nix;
-#[macro_use]
-extern crate quicli;
-extern crate anyhow;
-
 use gpio_cdev::*;
 use nix::poll::*;
 use quicli::prelude::*;
 use std::os::unix::io::AsRawFd;
+use structopt::StructOpt;
 
 type PollEventFlags = nix::poll::PollFlags;
 
@@ -82,11 +77,10 @@ fn do_main(args: Cli) -> anyhow::Result<()> {
     }
 }
 
-main!(|args: Cli| {
-    match do_main(args) {
-        Ok(()) => {}
-        Err(e) => {
-            println!("Error: {:?}", e);
-        }
-    }
-});
+fn main() -> CliResult {
+    let args = Cli::from_args();
+    do_main(args).or_else(|e| {
+        error!("{:?}", e);
+        Ok(())
+    })
+}
