@@ -493,7 +493,7 @@ impl Line {
         ffi::gpio_get_linehandle_ioctl(self.chip.file.as_raw_fd(), &mut request)?;
         Ok(LineHandle {
             line: self.clone(),
-            flags: flags,
+            flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
     }
@@ -587,14 +587,14 @@ impl LineInfo {
 
     /// Name assigned to this chip if assigned
     pub fn name(&self) -> Option<&str> {
-        self.name.as_ref().map(|s| s.as_str())
+        self.name.as_deref()
     }
 
     /// The name of this GPIO line, such as the output pin of the line on the
     /// chip, a rail or a pin header name on a board, as specified by the gpio
     /// chip.
     pub fn consumer(&self) -> Option<&str> {
-        self.consumer.as_ref().map(|s| s.as_str())
+        self.consumer.as_deref()
     }
 
     /// Get the direction of this GPIO if configured
@@ -790,7 +790,7 @@ impl Lines {
         let lines = self.lines.clone();
         Ok(MultiLineHandle {
             lines: Lines { lines },
-            flags: flags,
+            flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
     }
@@ -854,9 +854,7 @@ impl MultiLineHandle {
             return Err(invalid_err(n, values.len()));
         }
         let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
-        for i in 0..n {
-            data.values[i] = values[i];
-        }
+        data.values[..n].clone_from_slice(&values[..n]);
         ffi::gpiohandle_set_line_values_ioctl(self.file.as_raw_fd(), &mut data)?;
         Ok(())
     }

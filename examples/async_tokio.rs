@@ -8,7 +8,7 @@
 
 use futures::stream::StreamExt;
 use gpio_cdev::{AsyncLineEventHandle, Chip, EventRequestFlags, LineRequestFlags};
-use quicli::prelude::*;
+use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 struct Cli {

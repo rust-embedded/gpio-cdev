@@ -8,6 +8,7 @@
 
 use gpio_cdev::{Chip, LineRequestFlags};
 use quicli::prelude::*;
+use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 struct Cli {
@@ -40,9 +41,10 @@ fn do_main(args: Cli) -> std::result::Result<(), gpio_cdev::Error> {
     Ok(())
 }
 
-quicli::main!(|args: Cli| match do_main(args) {
-    Ok(()) => {}
-    Err(e) => {
-        println!("Error: {:?}", e);
-    }
-});
+fn main() -> CliResult {
+    let args = Cli::from_args();
+    do_main(args).or_else(|e| {
+        error!("{:?}", e);
+        Ok(())
+    })
+}
