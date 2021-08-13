@@ -692,6 +692,11 @@ impl LineHandle {
     pub fn line(&self) -> &Line {
         &self.line
     }
+
+    /// Get the flags with which this handle was created
+    pub fn flags(&self) -> LineRequestFlags {
+        self.flags
+    }
 }
 
 impl AsRawFd for LineHandle {
