@@ -8,19 +8,16 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-- Fix lsgpio example to output gpio line flags
-- Add `is_empty()` function for `Lines` struct
-- MSRV is now 1.46.0
-- Updated `nix` to version `0.22`.
-- Updated `bitflags` to version `1.3`.
-
 ## v0.5.0
 
+- Fix lsgpio example to output gpio line flags
+- Add `is_empty()` function for `Lines` struct
 - Update Tokio to 1.x. #[55]((https://github.com/rust-embedded/gpio-cdev/pull/55).
 - Breaking change of `LineEventHandle::get_event()` which now expects `&mut self`.
-- MSRV is now 1.45.0
-- Updated `nix` to version `0.20`.
+- MSRV is now 1.46.0
+- Updated `nix` to version `0.22`.
 - Updated `quicli` to version `0.4`.
+- Updated `bitflags` to version `1.3`.
 
 
 ## v0.4.0 - 2020-08-01
