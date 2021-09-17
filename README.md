@@ -19,7 +19,7 @@ GPIO Character Device](#sysfs-gpio-vs-gpio-character-device).
 
 ## Installation
 
-Add the following to your Cargo.toml
+Add the following to your `Cargo.toml`
 
 ```
 [dependencies]
@@ -34,7 +34,7 @@ Note that the following features are available:
 ## Examples
 
 There are several additional examples available in the [examples
-directory](https://github.com/posborne/rust-gpio-cdev/tree/master/examples).
+directory](https://github.com/rust-embedded/rust-gpio-cdev/tree/master/examples).
 
 ### Read State
 
