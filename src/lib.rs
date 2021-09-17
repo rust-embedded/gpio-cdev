@@ -107,7 +107,7 @@ mod async_tokio;
 pub mod errors; // pub portion is deprecated
 mod ffi;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum IoctlKind {
     ChipInfo,
     LineInfo,
@@ -168,6 +168,8 @@ pub struct Chip {
     inner: Arc<InnerChip>,
 }
 
+/// Iterator over chips
+#[derive(Debug)]
 pub struct ChipIterator {
     readdir: ReadDir,
 }
@@ -297,6 +299,7 @@ impl Chip {
 }
 
 /// Iterator over GPIO Lines for a given chip.
+#[derive(Debug)]
 pub struct LineIterator {
     chip: Arc<InnerChip>,
     idx: u32,
@@ -388,7 +391,7 @@ bitflags! {
 }
 
 /// In or Out
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LineDirection {
     In,
     Out,
@@ -893,7 +896,7 @@ impl AsRawFd for MultiLineHandle {
 /// Maps to kernel [`GPIOEVENT_EVENT_*`] definitions.
 ///
 /// [`GPIOEVENT_EVENT_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L136
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EventType {
     RisingEdge,
     FallingEdge,
