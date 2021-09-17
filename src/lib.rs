@@ -165,7 +165,7 @@ struct InnerChip {
 /// [`chips()`]: fn.chips.html
 #[derive(Debug)]
 pub struct Chip {
-    inner: Arc<Box<InnerChip>>,
+    inner: Arc<InnerChip>,
 }
 
 pub struct ChipIterator {
@@ -176,7 +176,7 @@ impl Iterator for ChipIterator {
     type Item = Result<Chip>;
 
     fn next(&mut self) -> Option<Result<Chip>> {
-        while let Some(entry) = self.readdir.next() {
+        for entry in &mut self.readdir {
             match entry {
                 Ok(entry) => {
                     if entry
@@ -213,7 +213,7 @@ impl Chip {
         ffi::gpio_get_chipinfo_ioctl(f.as_raw_fd(), &mut info)?;
 
         Ok(Chip {
-            inner: Arc::new(Box::new(InnerChip {
+            inner: Arc::new(InnerChip {
                 file: f,
                 path: path.as_ref().to_path_buf(),
                 name: unsafe {
@@ -227,7 +227,7 @@ impl Chip {
                         .into_owned()
                 },
                 lines: info.lines,
-            })),
+            }),
         })
     }
 
@@ -298,7 +298,7 @@ impl Chip {
 
 /// Iterator over GPIO Lines for a given chip.
 pub struct LineIterator {
-    chip: Arc<Box<InnerChip>>,
+    chip: Arc<InnerChip>,
     idx: u32,
 }
 
@@ -327,7 +327,7 @@ impl Iterator for LineIterator {
 ///
 #[derive(Debug, Clone)]
 pub struct Line {
-    chip: Arc<Box<InnerChip>>,
+    chip: Arc<InnerChip>,
     offset: u32,
 }
 
@@ -403,7 +403,7 @@ unsafe fn cstrbuf_to_string(buf: &[libc::c_char]) -> Option<String> {
 }
 
 impl Line {
-    fn new(chip: Arc<Box<InnerChip>>, offset: u32) -> Result<Line> {
+    fn new(chip: Arc<InnerChip>, offset: u32) -> Result<Line> {
         if offset >= chip.lines {
             return Err(offset_err(offset));
         }
@@ -716,7 +716,7 @@ pub struct Lines {
 }
 
 impl Lines {
-    fn new(chip: Arc<Box<InnerChip>>, offsets: &[u32]) -> Result<Lines> {
+    fn new(chip: Arc<InnerChip>, offsets: &[u32]) -> Result<Lines> {
         let res: Result<Vec<Line>> = offsets
             .iter()
             .map(|off| Line::new(chip.clone(), *off))
@@ -785,6 +785,7 @@ impl Lines {
             lines: n as u32,
             fd: 0,
         };
+        #[allow(clippy::needless_range_loop)] // clippy does not understand this loop correctly
         for i in 0..n {
             request.lineoffsets[i] = self.lines[i].offset();
             request.default_values[i] = default[i];
