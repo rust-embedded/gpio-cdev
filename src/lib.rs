@@ -731,6 +731,11 @@ impl Lines {
     }
 
     /// Get the number of lines in the collection
+    pub fn is_empty(&self) -> bool {
+        self.lines.is_empty()
+    }
+
+    /// Get the number of lines in the collection
     pub fn len(&self) -> usize {
         self.lines.len()
     }

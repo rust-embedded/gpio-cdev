@@ -9,6 +9,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 - Fix lsgpio example to output gpio line flags
+- Add `is_empty()` function for `Lines` struct
 
 ## v0.5.0
 
