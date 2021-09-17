@@ -967,7 +967,7 @@ impl LineEventHandle {
     pub fn get_event(&mut self) -> Result<LineEvent> {
         match self.read_event() {
             Ok(Some(event)) => Ok(event),
-            Ok(None) => Err(event_err(nix::Error::Sys(nix::errno::Errno::EIO))),
+            Ok(None) => Err(event_err(nix::errno::Errno::EIO)),
             Err(e) => Err(e.into()),
         }
     }

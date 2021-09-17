@@ -10,6 +10,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Fix lsgpio example to output gpio line flags
 - Add `is_empty()` function for `Lines` struct
+- MSRV is now 1.46.0
+- Updated `nix` to version `0.22`.
+- Updated `bitflags` to version `1.3`.
 
 ## v0.5.0
 
