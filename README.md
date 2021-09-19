@@ -1,6 +1,6 @@
 # gpio-cdev
 
-[![Build Status](https://travis-ci.org/rust-embedded/gpio-cdev.svg?branch=master)](https://travis-ci.org/rust-embedded/gpio-cdev)
+[![Build Status](https://github.com/rust-embedded/gpio-cdev/workflows/Build/badge.svg)](https://github.com/rust-embedded/gpio-cdev/actions)
 [![Version](https://img.shields.io/crates/v/gpio-cdev.svg)](https://crates.io/crates/gpio-cdev)
 [![License](https://img.shields.io/crates/l/gpio-cdev.svg)](https://github.com/rust-embedded/gpio-cdev/blob/master/README.md#license)
 
@@ -19,7 +19,7 @@ GPIO Character Device](#sysfs-gpio-vs-gpio-character-device).
 
 ## Installation
 
-Add the following to your Cargo.toml
+Add the following to your `Cargo.toml`
 
 ```
 [dependencies]
@@ -34,7 +34,7 @@ Note that the following features are available:
 ## Examples
 
 There are several additional examples available in the [examples
-directory](https://github.com/posborne/rust-gpio-cdev/tree/master/examples).
+directory](https://github.com/rust-embedded/rust-gpio-cdev/tree/master/examples).
 
 ### Read State
 
@@ -206,7 +206,7 @@ to be considered reliable.
 
 ## Minimum Supported Rust Version (MSRV)
 
-This crate is guaranteed to compile on stable Rust 1.45.0 and up. It *might*
+This crate is guaranteed to compile on stable Rust 1.46.0 and up. It *might*
 compile with older versions but that may change in any new patch release.
 
 ## License

@@ -88,11 +88,7 @@ impl Stream for AsyncLineEventHandle {
                     // Continue
                 }
                 Ok(Ok(Some(event))) => return Poll::Ready(Some(Ok(event))),
-                Ok(Ok(None)) => {
-                    return Poll::Ready(Some(Err(event_err(nix::Error::Sys(
-                        nix::errno::Errno::EIO,
-                    )))))
-                }
+                Ok(Ok(None)) => return Poll::Ready(Some(Err(event_err(nix::errno::Errno::EIO)))),
                 Ok(Err(err)) => return Poll::Ready(Some(Err(err.into()))),
             }
         }

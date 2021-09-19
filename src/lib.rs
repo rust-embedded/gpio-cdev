@@ -107,7 +107,7 @@ mod async_tokio;
 pub mod errors; // pub portion is deprecated
 mod ffi;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum IoctlKind {
     ChipInfo,
     LineInfo,
@@ -165,9 +165,11 @@ struct InnerChip {
 /// [`chips()`]: fn.chips.html
 #[derive(Debug)]
 pub struct Chip {
-    inner: Arc<Box<InnerChip>>,
+    inner: Arc<InnerChip>,
 }
 
+/// Iterator over chips
+#[derive(Debug)]
 pub struct ChipIterator {
     readdir: ReadDir,
 }
@@ -176,7 +178,7 @@ impl Iterator for ChipIterator {
     type Item = Result<Chip>;
 
     fn next(&mut self) -> Option<Result<Chip>> {
-        while let Some(entry) = self.readdir.next() {
+        for entry in &mut self.readdir {
             match entry {
                 Ok(entry) => {
                     if entry
@@ -209,11 +211,11 @@ impl Chip {
     /// Open the GPIO Chip at the provided path (e.g. `/dev/gpiochip<N>`)
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Chip> {
         let f = File::open(path.as_ref())?;
-        let mut info: ffi::gpiochip_info = unsafe { mem::MaybeUninit::uninit().assume_init() };
+        let mut info: ffi::gpiochip_info = unsafe { mem::zeroed() };
         ffi::gpio_get_chipinfo_ioctl(f.as_raw_fd(), &mut info)?;
 
         Ok(Chip {
-            inner: Arc::new(Box::new(InnerChip {
+            inner: Arc::new(InnerChip {
                 file: f,
                 path: path.as_ref().to_path_buf(),
                 name: unsafe {
@@ -227,7 +229,7 @@ impl Chip {
                         .into_owned()
                 },
                 lines: info.lines,
-            })),
+            }),
         })
     }
 
@@ -297,8 +299,9 @@ impl Chip {
 }
 
 /// Iterator over GPIO Lines for a given chip.
+#[derive(Debug)]
 pub struct LineIterator {
-    chip: Arc<Box<InnerChip>>,
+    chip: Arc<InnerChip>,
     idx: u32,
 }
 
@@ -327,7 +330,7 @@ impl Iterator for LineIterator {
 ///
 #[derive(Debug, Clone)]
 pub struct Line {
-    chip: Arc<Box<InnerChip>>,
+    chip: Arc<InnerChip>,
     offset: u32,
 }
 
@@ -388,7 +391,7 @@ bitflags! {
 }
 
 /// In or Out
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LineDirection {
     In,
     Out,
@@ -403,7 +406,7 @@ unsafe fn cstrbuf_to_string(buf: &[libc::c_char]) -> Option<String> {
 }
 
 impl Line {
-    fn new(chip: Arc<Box<InnerChip>>, offset: u32) -> Result<Line> {
+    fn new(chip: Arc<InnerChip>, offset: u32) -> Result<Line> {
         if offset >= chip.lines {
             return Err(offset_err(offset));
         }
@@ -560,8 +563,6 @@ impl Line {
 
         Ok(LineEventHandle {
             line: self.clone(),
-            handle_flags,
-            event_flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
     }
@@ -716,7 +717,7 @@ pub struct Lines {
 }
 
 impl Lines {
-    fn new(chip: Arc<Box<InnerChip>>, offsets: &[u32]) -> Result<Lines> {
+    fn new(chip: Arc<InnerChip>, offsets: &[u32]) -> Result<Lines> {
         let res: Result<Vec<Line>> = offsets
             .iter()
             .map(|off| Line::new(chip.clone(), *off))
@@ -728,6 +729,11 @@ impl Lines {
     /// Get a handle to the parent chip for the lines
     pub fn chip(&self) -> Chip {
         self.lines[0].chip()
+    }
+
+    /// Get the number of lines in the collection
+    pub fn is_empty(&self) -> bool {
+        self.lines.is_empty()
     }
 
     /// Get the number of lines in the collection
@@ -780,6 +786,7 @@ impl Lines {
             lines: n as u32,
             fd: 0,
         };
+        #[allow(clippy::needless_range_loop)] // clippy does not understand this loop correctly
         for i in 0..n {
             request.lineoffsets[i] = self.lines[i].offset();
             request.default_values[i] = default[i];
@@ -795,7 +802,6 @@ impl Lines {
         let lines = self.lines.clone();
         Ok(MultiLineHandle {
             lines: Lines { lines },
-            flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
     }
@@ -821,7 +827,6 @@ impl Index<usize> for Lines {
 #[derive(Debug)]
 pub struct MultiLineHandle {
     lines: Lines,
-    flags: LineRequestFlags,
     file: File,
 }
 
@@ -887,7 +892,7 @@ impl AsRawFd for MultiLineHandle {
 /// Maps to kernel [`GPIOEVENT_EVENT_*`] definitions.
 ///
 /// [`GPIOEVENT_EVENT_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L136
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EventType {
     RisingEdge,
     FallingEdge,
@@ -947,8 +952,6 @@ impl LineEvent {
 #[derive(Debug)]
 pub struct LineEventHandle {
     line: Line,
-    handle_flags: LineRequestFlags,
-    event_flags: EventRequestFlags,
     file: File,
 }
 
@@ -961,7 +964,7 @@ impl LineEventHandle {
     pub fn get_event(&mut self) -> Result<LineEvent> {
         match self.read_event() {
             Ok(Some(event)) => Ok(event),
-            Ok(None) => Err(event_err(nix::Error::Sys(nix::errno::Errno::EIO))),
+            Ok(None) => Err(event_err(nix::errno::Errno::EIO)),
             Err(e) => Err(e.into()),
         }
     }
