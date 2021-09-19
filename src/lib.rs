@@ -211,7 +211,7 @@ impl Chip {
     /// Open the GPIO Chip at the provided path (e.g. `/dev/gpiochip<N>`)
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Chip> {
         let f = File::open(path.as_ref())?;
-        let mut info: ffi::gpiochip_info = unsafe { mem::MaybeUninit::uninit().assume_init() };
+        let mut info: ffi::gpiochip_info = unsafe { mem::zeroed() };
         ffi::gpio_get_chipinfo_ioctl(f.as_raw_fd(), &mut info)?;
 
         Ok(Chip {
