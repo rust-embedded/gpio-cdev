@@ -563,8 +563,6 @@ impl Line {
 
         Ok(LineEventHandle {
             line: self.clone(),
-            handle_flags,
-            event_flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
     }
@@ -804,7 +802,6 @@ impl Lines {
         let lines = self.lines.clone();
         Ok(MultiLineHandle {
             lines: Lines { lines },
-            flags,
             file: unsafe { File::from_raw_fd(request.fd) },
         })
     }
@@ -830,7 +827,6 @@ impl Index<usize> for Lines {
 #[derive(Debug)]
 pub struct MultiLineHandle {
     lines: Lines,
-    flags: LineRequestFlags,
     file: File,
 }
 
@@ -956,8 +952,6 @@ impl LineEvent {
 #[derive(Debug)]
 pub struct LineEventHandle {
     line: Line,
-    handle_flags: LineRequestFlags,
-    event_flags: EventRequestFlags,
     file: File,
 }
 
