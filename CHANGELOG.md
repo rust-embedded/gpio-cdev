@@ -8,9 +8,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## v0.5.0
+## [v0.5.0] - 2021-09-20
 
-- Update Tokio to 1.x. #[55]((https://github.com/rust-embedded/gpio-cdev/pull/55).
+- Update Tokio to 1.x. [#55](https://github.com/rust-embedded/gpio-cdev/pull/55).
 - Fix lsgpio example to output gpio line flags.
 - Add `is_empty()` function for `Lines` struct.
 - Add common trait implementations for public structures.
@@ -21,13 +21,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - Updated `bitflags` to version `1.3`.
 
 
-## v0.4.0 - 2020-08-01
+## [v0.4.0] - 2020-08-01
 
 - Removed pub "errors" module.  Error now exposed at top level.
 - MSRV is now 1.39.0
 - Add support behind a feature flag for reading events from a line as a Stream via tokio. [#35](https://github.com/rust-embedded/gpio-cdev/pull/35).
 
-## v0.3.0 - 2020-02-10
+## [v0.3.0] - 2020-02-10
 
 Refactored Errors:
 - Removed the `error-chain` dependency.
@@ -51,4 +51,6 @@ Adds the ability to create a collection of lines from a single chip and read or 
 - Initial release of the library with basic operations centered around operating
   on a single line at a time.
 
-[Unreleased]: https://github.com/rust-embedded/gpio-cdev/compare/0.4.0...HEAD
+[Unreleased]: https://github.com/rust-embedded/gpio-cdev/compare/0.5.0...HEAD
+[v0.5.0]: https://github.com/rust-embedded/gpio-cdev/compare/0.4.0...0.5.0
+[v0.4.0]: https://github.com/rust-embedded/gpio-cdev/compare/0.3.0...0.4.0
