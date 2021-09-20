@@ -133,7 +133,7 @@ themselves as GPIO chips with the gpio subsystem.  Each of these chips provides
 access to a set of GPIOs.  At present, when this chip is registered a global
 base number is assigned to this driver.  The comments from the linux kernel
 [`gpio_chip_add_data`](https://elixir.bootlin.com/linux/v4.9.85/source/drivers/gpio/gpiolib.c#L1087)
-sum up the situation nicely when assignign the a base number to a GPIO chip
+sum up the situation nicely when assigning the a base number to a GPIO chip
 on registration.
 
     /*
