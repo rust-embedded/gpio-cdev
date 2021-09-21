@@ -8,7 +8,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [v0.5.0] - 2021-09-20
+## [v0.5.0] - 2021-09-21
 
 - Update Tokio to 1.x. [#55](https://github.com/rust-embedded/gpio-cdev/pull/55).
 - Fix lsgpio example to output gpio line flags.
