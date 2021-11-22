@@ -8,6 +8,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+
+## [v0.5.1] - 2021-11-22
+
 - Updated nix to version `0.23`.
 
 ## [v0.5.0] - 2021-09-21
@@ -53,6 +56,7 @@ Adds the ability to create a collection of lines from a single chip and read or 
 - Initial release of the library with basic operations centered around operating
   on a single line at a time.
 
-[Unreleased]: https://github.com/rust-embedded/gpio-cdev/compare/0.5.0...HEAD
+[Unreleased]: https://github.com/rust-embedded/gpio-cdev/compare/0.5.1...HEAD
+[v0.5.1]: https://github.com/rust-embedded/gpio-cdev/compare/0.5.0...0.5.1
 [v0.5.0]: https://github.com/rust-embedded/gpio-cdev/compare/0.4.0...0.5.0
 [v0.4.0]: https://github.com/rust-embedded/gpio-cdev/compare/0.3.0...0.4.0
