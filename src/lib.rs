@@ -83,7 +83,6 @@
 //! [README on Github]: https://github.com/rust-embedded/rust-gpio-cdev
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![doc(html_root_url = "https://docs.rs/gpio-cdev/0.5.0")]
 
 #[macro_use]
 extern crate bitflags;
