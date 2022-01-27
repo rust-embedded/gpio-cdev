@@ -88,8 +88,8 @@ impl StdError for Error {
 }
 
 impl From<IOError> for Error {
-    fn from(err: IOError) -> Error {
-        Error {
+    fn from(err: IOError) -> Self {
+        Self {
             kind: ErrorKind::Io(err),
         }
     }

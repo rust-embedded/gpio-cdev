@@ -124,11 +124,7 @@ pub use errors::*;
 
 unsafe fn rstr_lcpy(dst: *mut libc::c_char, src: &str, length: usize) {
     let copylen = min(src.len() + 1, length);
-    ptr::copy_nonoverlapping(
-        src.as_bytes().as_ptr() as *const libc::c_char,
-        dst,
-        copylen - 1,
-    );
+    ptr::copy_nonoverlapping(src.as_bytes().as_ptr().cast(), dst, copylen - 1);
     slice::from_raw_parts_mut(dst, length)[copylen - 1] = 0;
 }
 
@@ -209,12 +205,12 @@ pub fn chips() -> Result<ChipIterator> {
 
 impl Chip {
     /// Open the GPIO Chip at the provided path (e.g. `/dev/gpiochip<N>`)
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<Chip> {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let f = File::open(path.as_ref())?;
         let mut info: ffi::gpiochip_info = unsafe { mem::zeroed() };
         ffi::gpio_get_chipinfo_ioctl(f.as_raw_fd(), &mut info)?;
 
-        Ok(Chip {
+        Ok(Self {
             inner: Arc::new(InnerChip {
                 file: f,
                 path: path.as_ref().to_path_buf(),
@@ -406,11 +402,11 @@ unsafe fn cstrbuf_to_string(buf: &[libc::c_char]) -> Option<String> {
 }
 
 impl Line {
-    fn new(chip: Arc<InnerChip>, offset: u32) -> Result<Line> {
+    fn new(chip: Arc<InnerChip>, offset: u32) -> Result<Self> {
         if offset >= chip.lines {
             return Err(offset_err(offset));
         }
-        Ok(Line { chip, offset })
+        Ok(Self { chip, offset })
     }
 
     /// Get info about the line from the kernel.
@@ -491,8 +487,8 @@ impl Line {
                 request.consumer_label[..].as_mut_ptr(),
                 consumer,
                 request.consumer_label.len(),
-            )
-        };
+            );
+        }
         ffi::gpio_get_linehandle_ioctl(self.chip.file.as_raw_fd(), &mut request)?;
         Ok(LineHandle {
             line: self.clone(),
@@ -557,8 +553,8 @@ impl Line {
                 request.consumer_label[..].as_mut_ptr(),
                 consumer,
                 request.consumer_label.len(),
-            )
-        };
+            );
+        }
         ffi::gpio_get_lineevent_ioctl(self.chip.file.as_raw_fd(), &mut request)?;
 
         Ok(LineEventHandle {
@@ -603,9 +599,10 @@ impl LineInfo {
     /// Lines are considered to be inputs if not explicitly
     /// marked as outputs in the line info flags by the kernel.
     pub fn direction(&self) -> LineDirection {
-        match self.flags.contains(LineFlags::IS_OUT) {
-            true => LineDirection::Out,
-            false => LineDirection::In,
+        if self.flags.contains(LineFlags::IS_OUT) {
+            LineDirection::Out
+        } else {
+            LineDirection::In
         }
     }
 
@@ -667,7 +664,7 @@ impl LineHandle {
     /// This value should be 0 or 1 which a "1" representing that
     /// the line is active.  Usually this means that the line is
     /// at logic-level high but it could mean the opposite if the
-    /// line has been marked as being ACTIVE_LOW.
+    /// line has been marked as being `ACTIVE_LOW`.
     pub fn get_value(&self) -> Result<u8> {
         let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
         ffi::gpiohandle_get_line_values_ioctl(self.file.as_raw_fd(), &mut data)?;
@@ -678,7 +675,7 @@ impl LineHandle {
     ///
     /// The value should be 0 or 1 with 1 representing a request
     /// to make the line "active".  Usually "active" means
-    /// logic level high unless the line has been marked as ACTIVE_LOW.
+    /// logic level high unless the line has been marked as `ACTIVE_LOW`.
     ///
     /// Calling `set_value` on a line that is not an output will
     /// likely result in an error (from the kernel).
@@ -701,7 +698,7 @@ impl LineHandle {
 }
 
 impl AsRawFd for LineHandle {
-    /// Gets the raw file descriptor for the LineHandle.
+    /// Gets the raw file descriptor for the `LineHandle`.
     fn as_raw_fd(&self) -> RawFd {
         self.file.as_raw_fd()
     }
@@ -717,13 +714,13 @@ pub struct Lines {
 }
 
 impl Lines {
-    fn new(chip: Arc<InnerChip>, offsets: &[u32]) -> Result<Lines> {
+    fn new(chip: Arc<InnerChip>, offsets: &[u32]) -> Result<Self> {
         let res: Result<Vec<Line>> = offsets
             .iter()
             .map(|off| Line::new(chip.clone(), *off))
             .collect();
         let lines = res?;
-        Ok(Lines { lines })
+        Ok(Self { lines })
     }
 
     /// Get a handle to the parent chip for the lines
@@ -796,12 +793,12 @@ impl Lines {
                 request.consumer_label[..].as_mut_ptr(),
                 consumer,
                 request.consumer_label.len(),
-            )
-        };
+            );
+        }
         ffi::gpio_get_linehandle_ioctl(self.lines[0].chip().inner.file.as_raw_fd(), &mut request)?;
         let lines = self.lines.clone();
         Ok(MultiLineHandle {
-            lines: Lines { lines },
+            lines: Self { lines },
             file: unsafe { File::from_raw_fd(request.fd) },
         })
     }
@@ -841,7 +838,7 @@ impl MultiLineHandle {
     /// This value should be 0 or 1 which a "1" representing that
     /// the line is active.  Usually this means that the line is
     /// at logic-level high but it could mean the opposite if the
-    /// line has been marked as being ACTIVE_LOW.
+    /// line has been marked as being `ACTIVE_LOW`.
     pub fn get_values(&self) -> Result<Vec<u8>> {
         let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
         ffi::gpiohandle_get_line_values_ioctl(self.file.as_raw_fd(), &mut data)?;
@@ -854,7 +851,7 @@ impl MultiLineHandle {
     ///
     /// The value should be 0 or 1 with 1 representing a request
     /// to make the line "active".  Usually "active" means
-    /// logic level high unless the line has been marked as ACTIVE_LOW.
+    /// logic level high unless the line has been marked as `ACTIVE_LOW`.
     ///
     /// Calling `set_value` on a line that is not an output will
     /// likely result in an error (from the kernel).
@@ -881,7 +878,7 @@ impl MultiLineHandle {
 }
 
 impl AsRawFd for MultiLineHandle {
-    /// Gets the raw file descriptor for the LineHandle.
+    /// Gets the raw file descriptor for the `LineHandle`.
     fn as_raw_fd(&self) -> RawFd {
         self.file.as_raw_fd()
     }
@@ -923,8 +920,8 @@ impl LineEvent {
     /// in an interrupt handler so it should be very accurate.
     ///
     /// The nanosecond timestamp value should are captured
-    /// using the CLOCK_REALTIME offsets in the kernel and
-    /// should be compared against CLOCK_REALTIME values.
+    /// using the `CLOCK_REALTIME` offsets in the kernel and
+    /// should be compared against `CLOCK_REALTIME` values.
     pub fn timestamp(&self) -> u64 {
         self.0.timestamp
     }
@@ -974,7 +971,7 @@ impl LineEventHandle {
     /// This value should be 0 or 1 which a "1" representing that
     /// the line is active.  Usually this means that the line is
     /// at logic-level high but it could mean the opposite if the
-    /// line has been marked as being ACTIVE_LOW.
+    /// line has been marked as being `ACTIVE_LOW`.
     pub fn get_value(&self) -> Result<u8> {
         let mut data: ffi::gpiohandle_data = unsafe { mem::zeroed() };
         ffi::gpiohandle_get_line_values_ioctl(self.file.as_raw_fd(), &mut data)?;
@@ -990,23 +987,23 @@ impl LineEventHandle {
     /// enough data was read or the error returned by `read()`.
     pub(crate) fn read_event(&mut self) -> std::io::Result<Option<LineEvent>> {
         let mut data: ffi::gpioevent_data = unsafe { mem::zeroed() };
-        let mut data_as_buf = unsafe {
+        let data_as_buf = unsafe {
             slice::from_raw_parts_mut(
-                &mut data as *mut ffi::gpioevent_data as *mut u8,
+                (&mut data as *mut ffi::gpioevent_data).cast(),
                 mem::size_of::<ffi::gpioevent_data>(),
             )
         };
-        let bytes_read = self.file.read(&mut data_as_buf)?;
-        if bytes_read != mem::size_of::<ffi::gpioevent_data>() {
-            Ok(None)
-        } else {
+        let bytes_read = self.file.read(data_as_buf)?;
+        if bytes_read == mem::size_of::<ffi::gpioevent_data>() {
             Ok(Some(LineEvent(data)))
+        } else {
+            Ok(None)
         }
     }
 }
 
 impl AsRawFd for LineEventHandle {
-    /// Gets the raw file descriptor for the LineEventHandle.
+    /// Gets the raw file descriptor for the `LineEventHandle`.
     fn as_raw_fd(&self) -> RawFd {
         self.file.as_raw_fd()
     }
