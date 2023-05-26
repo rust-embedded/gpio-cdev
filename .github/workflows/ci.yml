@@ -63,6 +63,7 @@ jobs:
           args: --target=${{ matrix.TARGET }} --all-features
 
       - name: Test
+        if: ${{ ! contains(matrix.TARGET, 'mips') }} # https://github.com/rust-lang/rust/issues/108835
         uses: actions-rs/cargo@v1
         with:
           use-cross: true
@@ -70,6 +71,7 @@ jobs:
           args: --target=${{ matrix.TARGET }}
 
       - name: Test all features
+        if: ${{ ! contains(matrix.TARGET, 'mips') }} # https://github.com/rust-lang/rust/issues/108835
         uses: actions-rs/cargo@v1
         with:
           use-cross: true
@@ -113,4 +115,3 @@ jobs:
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-
