@@ -920,8 +920,10 @@ impl LineEvent {
     /// in an interrupt handler so it should be very accurate.
     ///
     /// The nanosecond timestamp value should are captured
-    /// using the `CLOCK_REALTIME` offsets in the kernel and
-    /// should be compared against `CLOCK_REALTIME` values.
+    /// using the `CLOCK_MONOTONIC` offsets in the kernel and
+    /// should be compared against `CLOCK_MONOTONIC` values.
+    /// Note that kernel versions prior to 5.7 used
+    /// `CLOCK_REALTIME` offsets instead.
     pub fn timestamp(&self) -> u64 {
         self.0.timestamp
     }

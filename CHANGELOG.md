@@ -8,6 +8,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- MSRV is now 1.59.0.
 
 ## [v0.5.1] - 2021-11-22
 
