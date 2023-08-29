@@ -335,7 +335,7 @@ pub struct Line {
 /// Wraps kernel [`struct gpioline_info`].
 ///
 /// [`struct gpioline_info`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L36
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct LineInfo {
     line: Line,
     flags: LineFlags,
@@ -349,6 +349,7 @@ bitflags! {
     /// Maps to kernel [`GPIOHANDLE_REQUEST_*`] flags.
     ///
     /// [`GPIOHANDLE_REQUEST_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L58
+    #[derive(Debug, Clone)]
     pub struct LineRequestFlags: u32 {
         const INPUT = (1 << 0);
         const OUTPUT = (1 << 1);
@@ -367,7 +368,7 @@ bitflags! {
     pub struct EventRequestFlags: u32 {
         const RISING_EDGE = (1 << 0);
         const FALLING_EDGE = (1 << 1);
-        const BOTH_EDGES = Self::RISING_EDGE.bits | Self::FALLING_EDGE.bits;
+        const BOTH_EDGES = Self::RISING_EDGE.bits() | Self::FALLING_EDGE.bits();
     }
 }
 
@@ -377,6 +378,7 @@ bitflags! {
     /// Maps to kernel [`GPIOLINE_FLAG_*`] flags.
     ///
     /// [`GPIOLINE_FLAG_*`]: https://elixir.bootlin.com/linux/v4.9.127/source/include/uapi/linux/gpio.h#L29
+    #[derive(Debug)]
     pub struct LineFlags: u32 {
         const KERNEL = (1 << 0);
         const IS_OUT = (1 << 1);
@@ -693,7 +695,7 @@ impl LineHandle {
 
     /// Get the flags with which this handle was created
     pub fn flags(&self) -> LineRequestFlags {
-        self.flags
+        self.flags.clone()
     }
 }
 
