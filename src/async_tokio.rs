@@ -97,6 +97,6 @@ impl Stream for AsyncLineEventHandle {
 
 impl AsRef<LineEventHandle> for AsyncLineEventHandle {
     fn as_ref(&self) -> &LineEventHandle {
-        &self.asyncfd.get_ref()
+        self.asyncfd.get_ref()
     }
 }

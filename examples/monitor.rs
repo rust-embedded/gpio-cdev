@@ -9,7 +9,7 @@
 use gpio_cdev::*;
 use nix::poll::*;
 use quicli::prelude::*;
-use std::os::unix::io::AsRawFd;
+use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd};
 use structopt::StructOpt;
 
 type PollEventFlags = nix::poll::PollFlags;
@@ -41,14 +41,13 @@ fn do_main(args: Cli) -> anyhow::Result<()> {
         .collect();
 
     // Create a vector of file descriptors for polling
-    let mut pollfds: Vec<PollFd> = evt_handles
+    let ownedfd: Vec<OwnedFd> = evt_handles
         .iter()
-        .map(|h| {
-            PollFd::new(
-                h.as_raw_fd(),
-                PollEventFlags::POLLIN | PollEventFlags::POLLPRI,
-            )
-        })
+        .map(|h| unsafe { OwnedFd::from_raw_fd(h.as_raw_fd()) })
+        .collect();
+    let mut pollfds: Vec<PollFd> = ownedfd
+        .iter()
+        .map(|fd| PollFd::new(fd, PollEventFlags::POLLIN | PollEventFlags::POLLPRI))
         .collect();
 
     loop {
