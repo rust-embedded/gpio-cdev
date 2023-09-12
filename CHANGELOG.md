@@ -8,6 +8,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [v0.6.0] - 2023-09-11
+
 - Updated nix to version `0.27`.
 - Updated bitflags to version `2.4`.
 - MSRV is now 1.65.0.
@@ -60,7 +62,8 @@ Adds the ability to create a collection of lines from a single chip and read or 
 - Initial release of the library with basic operations centered around operating
   on a single line at a time.
 
-[Unreleased]: https://github.com/rust-embedded/gpio-cdev/compare/0.5.1...HEAD
+[Unreleased]: https://github.com/rust-embedded/gpio-cdev/compare/0.6.0...HEAD
+[v0.6.0]: https://github.com/rust-embedded/gpio-cdev/compare/0.5.1...0.6.0
 [v0.5.1]: https://github.com/rust-embedded/gpio-cdev/compare/0.5.0...0.5.1
 [v0.5.0]: https://github.com/rust-embedded/gpio-cdev/compare/0.4.0...0.5.0
 [v0.4.0]: https://github.com/rust-embedded/gpio-cdev/compare/0.3.0...0.4.0
