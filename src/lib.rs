@@ -688,6 +688,13 @@ impl LineHandle {
         Ok(())
     }
 
+    pub fn set_low(&self) -> Result<()> {
+        return self.set_value(0);
+    }
+    pub fn set_high(&self) -> Result<()> {
+        return self.set_value(0);
+    }
+
     /// Get the Line information associated with this handle.
     pub fn line(&self) -> &Line {
         &self.line
