@@ -673,6 +673,14 @@ impl LineHandle {
         Ok(data.values[0])
     }
 
+    pub fn is_high(&self) -> Result<bool> {
+        return self.get_value()? == 1;
+    }
+
+    pub fn is_low(&self) -> Result<bool> {
+        return self.get_value()? == 1;
+    }
+
     /// Request that the line be driven to the specified value
     ///
     /// The value should be 0 or 1 with 1 representing a request
