@@ -674,11 +674,11 @@ impl LineHandle {
     }
 
     pub fn is_high(&self) -> Result<bool> {
-        return self.get_value()? == 1;
+        return Ok(self.get_value()? == 1);
     }
 
     pub fn is_low(&self) -> Result<bool> {
-        return self.get_value()? == 1;
+        return Ok(self.get_value()? == 1);
     }
 
     /// Request that the line be driven to the specified value
