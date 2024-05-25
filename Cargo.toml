@@ -27,6 +27,7 @@ tokio = { version = "1", features = ["io-std", "net"], optional = true }
 futures = { version = "0.3", optional = true }
 
 [dev-dependencies]
+ignore = "=0.4.20" # dep of `quicli`, make it compatible with rust 1.65.0
 quicli = "0.4"
 structopt = "0.3"
 anyhow = "1.0"

@@ -356,6 +356,13 @@ bitflags! {
         const ACTIVE_LOW = (1 << 2);
         const OPEN_DRAIN = (1 << 3);
         const OPEN_SOURCE = (1 << 4);
+        // https://elixir.bootlin.com/linux/v5.5/source/include/uapi/linux/gpio.h#L62
+        /// Available since Linux Kernel 5.5
+        const BIAS_PULL_UP = (1 << 5);
+        /// Available since Linux Kernel 5.5
+        const BIAS_PULL_DOWN = (1 << 6);
+        /// Available since Linux Kernel 5.5
+        const BIAS_PULL_DISABLE = (1 << 7);
     }
 }
 
@@ -385,6 +392,13 @@ bitflags! {
         const ACTIVE_LOW = (1 << 2);
         const OPEN_DRAIN = (1 << 3);
         const OPEN_SOURCE = (1 << 4);
+        // https://elixir.bootlin.com/linux/v5.5/source/include/uapi/linux/gpio.h#L30
+        /// Available since Linux Kernel 5.5
+        const BIAS_PULL_UP = (1 << 5);
+        /// Available since Linux Kernel 5.5
+        const BIAS_PULL_DOWN = (1 << 6);
+        /// Available since Linux Kernel 5.5
+        const BIAS_DISABLE = (1 << 7);
     }
 }
 
