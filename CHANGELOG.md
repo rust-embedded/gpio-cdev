@@ -11,6 +11,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - MSRV is now 1.82.0.
+- Add accessors for line bias (pull-up, pull-down).
 
 ## [v0.6.0] - 2023-09-11
 

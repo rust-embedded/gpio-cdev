@@ -356,6 +356,9 @@ bitflags! {
         const ACTIVE_LOW = (1 << 2);
         const OPEN_DRAIN = (1 << 3);
         const OPEN_SOURCE = (1 << 4);
+        const BIAS_PULL_UP = (1 << 5);
+        const BIAS_PULL_DOWN = (1 << 6);
+        const BIAS_DISABLE = (1 << 7);
     }
 }
 
@@ -385,6 +388,9 @@ bitflags! {
         const ACTIVE_LOW = (1 << 2);
         const OPEN_DRAIN = (1 << 3);
         const OPEN_SOURCE = (1 << 4);
+        const BIAS_PULL_UP = (1 << 5);
+        const BIAS_PULL_DOWN = (1 << 6);
+        const BIAS_DISABLE = (1 << 7);
     }
 }
 
@@ -393,6 +399,14 @@ bitflags! {
 pub enum LineDirection {
     In,
     Out,
+}
+
+/// How the line is biased
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LineBias {
+    PullUp,
+    PullDown,
+    Disabled,
 }
 
 unsafe fn cstrbuf_to_string(buf: &[libc::c_char]) -> Option<String> {
@@ -608,6 +622,23 @@ impl LineInfo {
         }
     }
 
+    /// Get how this line is biased
+    ///
+    /// Some is returned when only one bias flag is present.
+    /// If more than one flag or no flags are specified, None is returned.
+    pub fn bias(&self) -> Option<LineBias> {
+        let up = self.flags.contains(LineFlags::BIAS_PULL_UP);
+        let down = self.flags.contains(LineFlags::BIAS_PULL_DOWN);
+        let disabled = self.flags.contains(LineFlags::BIAS_DISABLE);
+
+        match (up, down, disabled) {
+            (true, false, false) => Some(LineBias::PullUp),
+            (false, true, false) => Some(LineBias::PullDown),
+            (false, false, true) => Some(LineBias::Disabled),
+            _ => None,
+        }
+    }
+
     /// True if the any flags for the device are set (input or output)
     pub fn is_used(&self) -> bool {
         !self.flags.is_empty()
@@ -636,6 +667,21 @@ impl LineInfo {
     /// True if this line is marked as open source in the kernel
     pub fn is_open_source(&self) -> bool {
         self.flags.contains(LineFlags::OPEN_SOURCE)
+    }
+
+    // True if the line is marked as having a pull-up bias
+    pub fn is_bias_pull_up(&self) -> bool {
+        self.flags.contains(LineFlags::BIAS_PULL_UP)
+    }
+
+    // True if the line is marked as having a pull-down bias
+    pub fn is_bias_pull_down(&self) -> bool {
+        self.flags.contains(LineFlags::BIAS_PULL_DOWN)
+    }
+
+    // True if the line is marked as having a disabled bias
+    pub fn is_bias_disabled(&self) -> bool {
+        self.flags.contains(LineFlags::BIAS_DISABLE)
     }
 }
 
