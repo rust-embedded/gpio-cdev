@@ -6,11 +6,11 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use clap::Parser;
 use futures::stream::StreamExt;
 use gpio_cdev::{AsyncLineEventHandle, Chip, EventRequestFlags, LineRequestFlags};
-use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 struct Cli {
     /// The gpiochip device (e.g. /dev/gpiochip0)
     chip: String,
@@ -27,18 +27,15 @@ async fn do_main(args: Cli) -> std::result::Result<(), gpio_cdev::Error> {
         "gpioevents",
     )?)?;
 
-    loop {
-        match events.next().await {
-            Some(event) => println!("{:?}", event?),
-            None => break,
-        };
+    while let Some(event) = events.next().await {
+        println!("{:?}", event?);
     }
 
     Ok(())
 }
 
 #[tokio::main]
-async fn main() {
-    let args = Cli::from_args();
-    do_main(args).await.unwrap();
+async fn main() -> std::result::Result<(), gpio_cdev::Error> {
+    let args = Cli::parse();
+    do_main(args).await
 }

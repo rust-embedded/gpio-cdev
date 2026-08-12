@@ -6,15 +6,17 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use clap::Parser;
 use gpio_cdev::*;
 use nix::poll::*;
-use quicli::prelude::*;
-use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd};
-use structopt::StructOpt;
+use std::os::{
+    fd::AsFd,
+    unix::io::{AsRawFd, FromRawFd, OwnedFd},
+};
 
 type PollEventFlags = nix::poll::PollFlags;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 struct Cli {
     /// The gpiochip device (e.g. /dev/gpiochip0)
     chip: String,
@@ -47,12 +49,12 @@ fn do_main(args: Cli) -> anyhow::Result<()> {
         .collect();
     let mut pollfds: Vec<PollFd> = ownedfd
         .iter()
-        .map(|fd| PollFd::new(fd, PollEventFlags::POLLIN | PollEventFlags::POLLPRI))
+        .map(|fd| PollFd::new(fd.as_fd(), PollEventFlags::POLLIN | PollEventFlags::POLLPRI))
         .collect();
 
     loop {
         // poll for an event on any of the lines
-        if poll(&mut pollfds, -1)? == 0 {
+        if poll(&mut pollfds, PollTimeout::NONE)? == 0 {
             println!("Timeout?!?");
         } else {
             for i in 0..pollfds.len() {
@@ -76,10 +78,7 @@ fn do_main(args: Cli) -> anyhow::Result<()> {
     }
 }
 
-fn main() -> CliResult {
-    let args = Cli::from_args();
-    do_main(args).or_else(|e| {
-        error!("{:?}", e);
-        Ok(())
-    })
+fn main() -> anyhow::Result<()> {
+    let args = Cli::parse();
+    do_main(args)
 }

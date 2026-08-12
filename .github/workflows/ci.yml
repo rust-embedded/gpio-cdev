@@ -4,12 +4,9 @@ on:
     - "gh-readonly-queue/**"
   pull_request: # Run CI for PRs on any branch
   merge_group: # Run CI for the GitHub merge queue
-
 name: Build
-
 env:
   RUSTFLAGS: '--deny warnings'
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -32,86 +29,50 @@ jobs:
           - s390x-unknown-linux-gnu
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
-
         include:
           # MSRV
-          - rust: 1.82.0
+          - rust: 1.85.0
             TARGET: x86_64-unknown-linux-gnu
-
           # Test nightly but don't fail
           - rust: nightly
             TARGET: x86_64-unknown-linux-gnu
             experimental: true
-
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.rust }}
-          target: ${{ matrix.TARGET }}
-          override: true
-
+      - uses: actions/checkout@v4
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross --locked
       - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --target=${{ matrix.TARGET }}
-
+        run: cross build --target=${{ matrix.TARGET }}
       - name: Build all features
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --target=${{ matrix.TARGET }} --all-features
-
+        run: cross build --target=${{ matrix.TARGET }} --all-features
       - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: test
-          args: --target=${{ matrix.TARGET }}
-
+        run: cross test --target=${{ matrix.TARGET }}
       - name: Test all features
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: test
-          args: --target=${{ matrix.TARGET }} --all-features
-
+        run: cross test --target=${{ matrix.TARGET }} --all-features
   checks:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
           components: rustfmt
-
+      - uses: Swatinem/rust-cache@v2
+      - name: Ensure rustfmt is installed
+        run: rustup component add rustfmt
       - name: Doc
-        uses: actions-rs/cargo@v1
-        with:
-          command: doc
-
+        run: cargo doc
       - name: Formatting
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-
+        run: cargo fmt --all -- --check
   clippy:
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: '--allow warnings'
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          toolchain: 1.82.0
+          toolchain: 1.85.0
           components: clippy
-
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings

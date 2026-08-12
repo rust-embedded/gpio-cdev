@@ -123,9 +123,11 @@ pub use crate::async_tokio::AsyncLineEventHandle;
 pub use errors::*;
 
 unsafe fn rstr_lcpy(dst: *mut libc::c_char, src: &str, length: usize) {
-    let copylen = min(src.len() + 1, length);
-    ptr::copy_nonoverlapping(src.as_bytes().as_ptr().cast(), dst, copylen - 1);
-    slice::from_raw_parts_mut(dst, length)[copylen - 1] = 0;
+    unsafe {
+        let copylen = min(src.len() + 1, length);
+        ptr::copy_nonoverlapping(src.as_bytes().as_ptr().cast(), dst, copylen - 1);
+        slice::from_raw_parts_mut(dst, length)[copylen - 1] = 0;
+    }
 }
 
 #[derive(Debug)]
@@ -396,10 +398,12 @@ pub enum LineDirection {
 }
 
 unsafe fn cstrbuf_to_string(buf: &[libc::c_char]) -> Option<String> {
-    if buf[0] == 0 {
-        None
-    } else {
-        Some(CStr::from_ptr(buf.as_ptr()).to_string_lossy().into_owned())
+    unsafe {
+        if buf[0] == 0 {
+            None
+        } else {
+            Some(CStr::from_ptr(buf.as_ptr()).to_string_lossy().into_owned())
+        }
     }
 }
 

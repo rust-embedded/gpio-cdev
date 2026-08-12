@@ -20,18 +20,17 @@ name = "async_tokio"
 required-features = ["async-tokio"]
 
 [dependencies]
-bitflags = "2.4"
+bitflags = "2.13"
 libc = "0.2"
-nix = { version = "0.27", features = ["ioctl"] }
+nix = { version = "0.31", features = ["ioctl"] }
 tokio = { version = "1", features = ["io-std", "net"], optional = true }
 futures = { version = "0.3", optional = true }
 
 [dev-dependencies]
-quicli = "0.4"
-structopt = "0.3"
+clap = { version = "4", features = ["derive"] }
 anyhow = "1.0"
 tokio = { version = "1", features = ["io-std", "rt-multi-thread", "macros", "net"] }
-nix = { version = "0.27", features = ["ioctl", "poll"] }
+nix = { version = "0.31", features = ["ioctl", "poll"] }
 
 [package.metadata.docs.rs]
 # To build locally:

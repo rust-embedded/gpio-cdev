@@ -6,11 +6,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use clap::Parser;
 use gpio_cdev::{Chip, LineRequestFlags};
-use quicli::prelude::*;
-use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 struct Cli {
     /// The gpiochip device (e.g. /dev/gpiochip0)
     chip: String,
@@ -29,10 +28,7 @@ fn do_main(args: Cli) -> std::result::Result<(), gpio_cdev::Error> {
     Ok(())
 }
 
-fn main() -> CliResult {
-    let args = Cli::from_args();
-    do_main(args).or_else(|e| {
-        error!("{:?}", e);
-        Ok(())
-    })
+fn main() -> std::result::Result<(), gpio_cdev::Error> {
+    let args = Cli::parse();
+    do_main(args)
 }
